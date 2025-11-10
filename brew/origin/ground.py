@@ -63,9 +63,13 @@ class EventLog:
                 event_log = self.__load_mat_file__(file)
                 event_log[:, 1] = event_log[:, 1] + last_timestamp  # offset timestamps by the last timestamp
                 last_timestamp = np.max(event_log[:, 1])
-                stack.append(event_log)
+                stack.append(event_log[:, 0:2])
             stack = np.vstack(stack).squeeze() if len(stack) > 0 else np.squeeze(stack)
-            stack = stack[stack[:, 1] != 0]  # only return valid data
+            if len(stack) > 0:
+                stack = np.vstack(stack)
+                stack = stack[stack[:, 0] != 0]  # ← FILTER BY EVENT CODE, NOT TIMESTAMP
+            else:
+                stack = np.empty((0, 2))
         return stack
 
     def __create_event_log__(self) -> pd.DataFrame:
@@ -111,7 +115,7 @@ class EventLog:
 
 if __name__ == "__main__":
     t1 = EventLog(
-        data=r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat")
+        data=r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat")
     print(t1.get_dataframe())
 
     event_dict = {
@@ -123,6 +127,6 @@ if __name__ == "__main__":
         4: "infusion",
     }
     t2 = EventLog(
-        data=[r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat", r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"], event_dict=event_dict)
+        data=[r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat", r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"], event_dict=event_dict)
     print(t2.get_dataframe().sort_values(by="label"))
     print(t2)

@@ -1,4 +1,4 @@
-# sample.py
+# bean.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
 # Encapsulates an aligned sample of event logs and neural fluorescence signals.
@@ -80,10 +80,10 @@ if __name__ == "__main__":
         4: "infusion",
     }
     sample = Sample(
-        event_data=[r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat", r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"],
-        signal_data=[r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy", r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"],
+        event_data=[r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat", r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"],
+        signal_data=[r"../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy", r"../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"],
         event_dict=event_dict,
         fps=30,
-        frame_averaging=4
+        frame_averaging=4,
     )
-    print(sample.get_dataframe())
+    print(sample.get_dataframe().sort_values(by="label"))

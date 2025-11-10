@@ -70,9 +70,9 @@ class SignalRecording:
 
 if __name__ == "__main__":
     t1 = SignalRecording(name="Test Signal Recording 1",
-        data=r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy")
+        data=r"./../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy")
     print(t1)
 
-    t2 = SignalRecording(name="Test Signal Recording 2", data=[r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy", r"/home/thejoshbq/Desktop/Projects/brew/data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"])
+    t2 = SignalRecording(name="Test Signal Recording 2", data=[r"./../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy", r"./../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"])
     print(t2)
     print(t2.get_array())
