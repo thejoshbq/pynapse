@@ -33,7 +33,7 @@ class SignalRecording:
         return self._signals.shape[0]
 
     @property
-    def num_timepoints(self) -> int:
+    def num_frames(self) -> int:
         """Returns the number of timepoints in the signal recording."""
         return self._signals.shape[1]
 
