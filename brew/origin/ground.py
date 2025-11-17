@@ -18,33 +18,44 @@ from typing import Any, Dict, List, Union, Optional
 class EventLog:
     def __init__(
         self,
-        data: List[Union[str, Path]] | Union[str, Path] | str,
+        source: List[Union[str, Path]] | Union[str, Path] | str,
         name: str = "Brew Event Log",
         event_dict: Optional[Dict[int, str]] = None,
-        data_alignment: Union[str, Path] = None,
-        fps: float = 30.0,
-        frame_averaging: int = 1,
     ):
         self._name = name
+        self._source = source
         self._event_log = None
         self._event_dict = event_dict
-        self._data_alignment = data_alignment
-        self._fps = fps
-        self.frame_averaging = frame_averaging
-        self._effective_fps = fps / frame_averaging
-        self._frame_duration = 1.0 / self._effective_fps
-        self._interframe_interval = 1000.0 / self._fps
 
-        if isinstance(data, str) or isinstance(data, Path):
-            if os.path.isfile(data):
-                if data.endswith(".mat"):
+        if isinstance(source, str) or isinstance(source, Path):
+            if os.path.isfile(source):
+                if source.endswith(".mat"):
                     warnings.warn("Use of MATLAB-produced event logs for the 'event_log' parameter is deprecated and will be removed in a future version.", DeprecationWarning)
-                    self._data = self.__load_mat_file__(data)
-                elif data.endswith(".csv"):
-                    pass # FIXME: implement CSV reader
-        elif isinstance(data, List):
-            self._data = self.__compile_mat_files__(data)
+                    self._raw_data = self.__load_mat_file__(source)
+                elif source.endswith(".csv"):
+                    pass # FIXME: CSV reader to be implemented in future version
+                else:
+                    raise ValueError("Unsupported file format.")
+            else:
+                raise ValueError("File does not exist.")
+        elif isinstance(source, List):
+            self._raw_data = self.__compile_mat_files__(source)
         self._event_log = self.__create_event_log__()
+
+    @property
+    def name(self) -> str:
+        """Returns the name of the event log."""
+        return self._name
+
+    @property
+    def source(self) -> Union[str, Path] | List[Union[str, Path]] | str:
+        """Returns the source of the event log."""
+        return self._source
+
+    @property
+    def num_events(self) -> int:
+        """Returns the number of events in the event log."""
+        return len(self._event_log)
 
     @staticmethod
     @deprecated("DEPRECATED: Use of MATLAB-produced event logs for the 'event_log' parameter is deprecated and will be removed in a future version.")
@@ -68,7 +79,7 @@ class EventLog:
         stack = []
         last_timestamp = 0
         if isinstance(paths, list) and len(paths) > 0:
-            for file in paths:
+            for file in sorted(paths):
                 event_log = self.__load_mat_file__(file)
                 event_log[:, 1] = event_log[:, 1] + last_timestamp  # offset timestamps by the last timestamp
                 last_timestamp = np.max(event_log[:, 1])
@@ -76,14 +87,14 @@ class EventLog:
             stack = np.vstack(stack).squeeze() if len(stack) > 0 else np.squeeze(stack)
             if len(stack) > 0:
                 stack = np.vstack(stack)
-                stack = stack[stack[:, 0] != 0]  # ← FILTER BY EVENT CODE, NOT TIMESTAMP
+                stack = stack[stack[:, 0] != 0]
             else:
                 stack = np.empty((0, 2))
         return stack
 
     def __create_event_log__(self) -> pd.DataFrame:
         """Creates a human-readable table from the event log. The table contains the following columns: code, t1, t2, label."""
-        log = np.asarray(self._data)
+        log = np.asarray(self._raw_data)
         n_rows, n_cols = log.shape
 
         data = {
@@ -113,9 +124,9 @@ class EventLog:
         """Returns a dictionary mapping event codes to event labels."""
         return self._event_dict
 
-    def get_data(self) -> NDArray[Any]:
+    def get_raw_data(self) -> NDArray[Any]:
         """Returns the event log as a numpy array."""
-        return self._data
+        return self._raw_data
 
     def count_events(self, target: int | str = None) -> int:
         """Returns the number of events in the event log."""
@@ -128,12 +139,20 @@ class EventLog:
                 return self._event_log.loc[self._event_log["code"] == target, "code"].count()
 
     def __str__(self):
-        return f"{self._name} ({self.count_events()} events)"
+        name = f"Name: {self.name}"
+        if isinstance(self._source, str):
+            source = f"Source: {self._source.split('/')[-1]}"
+        else:
+            source = "Source:"
+            for s in self._source:
+                source += f"\n - {s.split('/')[-1]}"
+        n_neurons = f"Number of Events: {self.count_events()}"
+        return f"{name}\n{source}\n{n_neurons}"
 
 if __name__ == "__main__":
     t1 = EventLog(
-        data=r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat")
-    print(t1.get_dataframe())
+        source=r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat")
+    print(t1)
 
     event_dict = {
         22: "active_lever",
@@ -144,9 +163,7 @@ if __name__ == "__main__":
         4: "infusion",
     }
     t2 = EventLog(
-        data=[r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat", r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"],
-        event_dict=event_dict,
-        data_alignment=r"../../data/empty.mat"
+        source=[r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat", r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"],
+        event_dict=event_dict
     )
     print(t2.get_dataframe().sort_values(by="label"))
-    print(t2)

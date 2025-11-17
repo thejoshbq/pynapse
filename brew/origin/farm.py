@@ -16,41 +16,31 @@ class Project:
         self._authors = authors
         self._description = description
 
-    # private
-
-    # public
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return self._name
 
-    def set_populations(self, populations: List[Population]):
-        self._populations = populations
+    @property
+    def description(self) -> str:
+        return self._description
 
-    def get_populations(self) -> List[Population]:
-        return self._populations
-
-    def set_authors(self, authors: List[str]):
-        self._authors = authors
+    @property
+    def num_populations(self) -> int:
+        return len(self._populations)
 
     def get_authors(self) -> List[str]:
         return self._authors
 
-    def set_description(self, description: str):
-        self._description = description
-
-    def get_description(self) -> str:
-        return self._description
+    def get_populations(self) -> List[Population]:
+        return self._populations
 
     def __str__(self):
-        authors = ""
-        for author in self._authors:
-            authors += f"\n - {author}"
-
-        populations = ""
+        name = f"Name: {self.name}"
+        desc = f"Description: {self.description}"
+        populations = "Populations:"
         for population in self._populations:
-            populations += f"\n - {population.get_name()}"
-
-        info = f"""Project: {self._name}\nPopulations: {populations}\nAuthors: {authors}\nDescription: {self._description}"""
-        return info
+            populations += f"\n - {population.name}, n={population.num_samples} ({population.num_neurons} neurons)"
+        return f"{name}\n{desc}\n{populations}"
 
 if __name__ == "__main__":
     from bean import Sample
@@ -69,6 +59,7 @@ if __name__ == "__main__":
         event_dict=event_dict,
         fps=30,
         frame_averaging=4,
+        name="Sample 1"
     )
     sample2 = Sample(
         event_data=r"../../data/0 EarlyAcq/ER-L1/FOV1/ER-L1_HER-2P_HI_D1_PrL-FOV1_0_6000_191105-180825.mat",
@@ -76,6 +67,7 @@ if __name__ == "__main__":
         event_dict=event_dict,
         fps=30,
         frame_averaging=4,
+        name="Sample 2"
     )
 
     population1 = Population(name="Population 1", samples=[sample1, sample2])

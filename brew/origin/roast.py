@@ -16,16 +16,26 @@ from typing import Any, List, Union
 class SignalRecording:
     def __init__(
         self,
-        data: List[Union[str, Path]] | Union[str, Path] | str,
+        source: List[Union[str, Path]] | Union[str, Path] | str,
         name: str = "Brew Signal Recording",
     ):
         self._name = name
-        self._signals = None
+        self._source = source
 
-        if isinstance(data, list):
-            self._signals = self.__compile_npy_files__(data)
-        elif isinstance(data, str) or isinstance(data, Path):
-            self._signals = self.__load_npy_file__(data)
+        if isinstance(source, list):
+            self._signals = self.__compile_npy_files__(source)
+        elif isinstance(source, str) or isinstance(source, Path):
+            self._signals = self.__load_npy_file__(source)
+
+    @property
+    def name(self) -> str:
+        """Returns the name of the signal recording."""
+        return self._name
+
+    @property
+    def source(self) -> Union[str, Path] | List[Union[str, Path]] | str:
+        """Returns the source of the signal recording."""
+        return self._source
 
     @property
     def num_neurons(self) -> int:
@@ -57,22 +67,31 @@ class SignalRecording:
         """Concatenates multiple numpy files into a single signal recording."""
         stack = []
         if isinstance(paths, list) and len(paths) > 0:
-            for file in paths:
+            for file in sorted(paths):
                 stack.append(self.__load_npy_file__(file))
         return np.hstack(stack).squeeze() if len(stack) > 0 else np.array(stack)
 
-    def get_array(self) -> NDArray[Any]:
-        """Returns the signals as a numpy array."""
+    def get_signals(self) -> NDArray[Any]:
+        """Returns the signals of the signal recording."""
         return self._signals
 
     def __str__(self):
-        return f"{self._name}"
+        name = f"Name: {self.name}"
+        if isinstance(self._source, str):
+            source = f"Source: {self._source.split('/')[-1]}"
+        else:
+            source = "Source:"
+            for s in self._source:
+                source += f"\n - {s.split('/')[-1]}"
+        n_neurons = f"Number of Neurons: {self.num_neurons}"
+        n_frames = f"Number of Frames: {self.num_frames}"
+        return f"{name}\n{source}\n{n_neurons}\n{n_frames}"
 
 if __name__ == "__main__":
     t1 = SignalRecording(name="Test Signal Recording 1",
-        data=r"./../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy")
+                         source=r"./../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy")
     print(t1)
 
-    t2 = SignalRecording(name="Test Signal Recording 2", data=[r"./../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy", r"./../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"])
+    t2 = SignalRecording(name="Test Signal Recording 2", source=[r"./../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy", r"./../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"])
     print(t2)
-    print(t2.get_array())
+    print(t2.get_signals())
