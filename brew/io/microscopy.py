@@ -1,7 +1,18 @@
-# roast.py
+# microscopy.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
-# Structures 2-photon imaging recordings of neural fluorescence.
+
+"""
+Provides the SignalRecording class for handling neural fluorescence recordings.
+
+This module is focused on structuring `.npy` 2-photon imaging recording files
+of neural fluorescence. The primary class, SignalRecording, enables loading,
+processing, and analyzing these recordings.
+
+Classes:
+    - SignalRecording: Handles neural signal recordings, including loading
+      and concatenating `.npy` files.
+"""
 
 import os
 from pathlib import Path
@@ -13,11 +24,12 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Any, List, Union
 
+
 class SignalRecording:
     def __init__(
         self,
         source: List[Union[str, Path]] | Union[str, Path] | str,
-        name: str = "Brew Signal Recording",
+        name: str = "Signal Recording",
     ):
         self._name = name
         self._source = source

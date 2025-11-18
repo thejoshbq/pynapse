@@ -1,13 +1,29 @@
-# lot.py
+# population.py
+# Joshua Boquiren (@thejoshbq)
+# boquiren@musc.edu
+
+"""
+Encapsulates a population of samples.
+
+This module defines the Population class, which aggregates a collection of
+samples and provides computed properties related to the population such as
+the total number of samples, neurons, and events. Population instances can
+also include metadata such as name and description.
+
+Classes:
+    Population: Represents a group of Sample objects with additional
+                computed properties and metadata.
+"""
 
 from typing import List
-from bean import Sample
+from sample import Sample
+
 
 class Population:
     def __init__(
         self,
         samples: List[Sample],
-        name: str = "Brew Population",
+        name: str = "Population",
         description: str = None,
     ):
         self._samples = samples

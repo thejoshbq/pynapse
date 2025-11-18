@@ -1,7 +1,18 @@
-# ground.py
+# behavior.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
-# Structures .mat files produced from custom MATLAB scripts (Otis Lab, MUSC) and REACHER event logs.
+
+"""
+Module to handle event logs derived from MATLAB files or CSVs. Provides functionalities
+to parse, process, and export the event log into human-readable formats using pandas.
+
+The EventLog class supports loading individual or multiple event log files, creating a
+human-readable event log in the form of a pandas DataFrame, and mapping event codes to
+labels using an optional event dictionary.
+
+Classes:
+    - EventLog: Represents an event log and provides various utilities to process and analyze it.
+"""
 
 import os
 from pathlib import Path
@@ -15,11 +26,12 @@ import pandas as pd
 from numpy.typing import NDArray
 from typing import Any, Dict, List, Union, Optional
 
+
 class EventLog:
     def __init__(
         self,
         source: List[Union[str, Path]] | Union[str, Path] | str,
-        name: str = "Brew Event Log",
+        name: str = "Event Log",
         event_dict: Optional[Dict[int, str]] = None,
     ):
         self._name = name

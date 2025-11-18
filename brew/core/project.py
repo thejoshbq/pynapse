@@ -1,12 +1,25 @@
-# farm.py
+# project.py
+# Joshua Boquiren (@thejoshbq)
+# boquiren@musc.edu
+
+"""
+Encapsulates a project of behavioral and neural fluorescence data.
+
+This module provides the Project class to manage data collections,
+which include populations, authors, and project descriptions. It
+facilitates the handling and organization of multiple associated
+populations and their details, allowing structured representation
+of project information.
+"""
 
 from typing import List
-from lot import Population
+from population import Population
+
 
 class Project:
     def __init__(
             self,
-            name: str = "Brew Project",
+            name: str = "Project",
             populations: List[Population] = None,
             authors: List[str] = None,
             description: str = None,
@@ -43,7 +56,7 @@ class Project:
         return f"{name}\n{desc}\n{populations}"
 
 if __name__ == "__main__":
-    from bean import Sample
+    from sample import Sample
 
     event_dict = {
         22: "active_lever",

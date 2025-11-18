@@ -1,15 +1,31 @@
-# bean.py
+# sample.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
-# Encapsulates an aligned sample of event logs and neural fluorescence signals.
+
+"""
+Aligns and encapsulates a sample of event logs and neural fluorescence signals.
+
+This module provides an interface for processing and organizing event log data
+and neural signal recordings. It integrates functionality for frame timestamp
+alignment, event counting, and data exportation through pandas DataFrames. The
+module supports various configurations such as frame averaging and frame
+correction using an optional correction file.
+
+Uses external dependencies such as `brew.io.behavior.EventLog` for managing
+event logs and `brew.io.microscopy.SignalRecording` for neural signal data.
+
+Classes:
+    Sample: Represents a single experimental sample integrating event logs
+            and signal recordings.
+"""
 
 import numpy as np
 import pandas as pd
 import scipy.io as sio
 from typing import Dict, List, Optional, Union
 from pathlib import Path
-from ground import EventLog
-from roast import SignalRecording
+from brew.io.behavior import EventLog
+from brew.io.microscopy import SignalRecording
 
 
 class Sample:
@@ -17,7 +33,7 @@ class Sample:
         self,
         event_data: List[Union[str, Path]] | Union[str, Path] | str | EventLog,
         signal_data: List[Union[str, Path]] | Union[str, Path] | str | SignalRecording,
-        name: str = "Brew Sample",
+        name: str = "Sample",
         event_dict: Optional[Dict[int, str]] = None,
         fps: float = 30.0,
         frame_averaging: int = 1,
