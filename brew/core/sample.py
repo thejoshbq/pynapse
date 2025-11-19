@@ -1,14 +1,13 @@
 # sample.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
-
 """
 Aligns and encapsulates a sample of event logs and neural fluorescence signals.
 
 This module provides an interface for processing and organizing event log data
 and neural signal recordings. It integrates functionality for frame timestamp
 alignment, event counting, and data exportation through pandas DataFrames. The
-module supports various configurations such as frame averaging and frame
+module supports various configurations, such as frame averaging and frame
 correction using an optional correction file.
 
 Uses external dependencies such as `brew.io.behavior.EventLog` for managing
@@ -33,7 +32,7 @@ class Sample:
         self,
         event_data: List[Union[str, Path]] | Union[str, Path] | str | EventLog,
         signal_data: List[Union[str, Path]] | Union[str, Path] | str | SignalRecording,
-        name: str = "Sample",
+        name: str | None = None,
         event_dict: Optional[Dict[int, str]] = None,
         fps: float = 30.0,
         frame_averaging: int = 1,
@@ -41,8 +40,9 @@ class Sample:
         correction_file: Union[str, Path, None] = None,
         start_time: float = 0.0,
     ):
-        self._name = name
+        self._name = name or self.__class__.__name__
         self._fps = fps
+        self._event_dict = event_dict
         self._frame_averaging = frame_averaging
         self._start_time = start_time
         self._frame_correction = frame_correction
@@ -107,16 +107,13 @@ class Sample:
         return self._event_log.count_events(target)
 
     def _handle_missed_frames(self, frame_ts_raw: np.ndarray) -> np.ndarray:
-        """Insert missing frames when we have real frame triggers (code 9)."""
         frame_ts = frame_ts_raw.copy()
         if frame_ts.size == 0:
             n = self.num_frames * self._frame_averaging
             return np.arange(n) * self.interframe_interval
-
         first = np.array([0.0])
         last = np.array([np.max(frame_ts) + 500 * self.interframe_interval])
         temp = np.concatenate((first, frame_ts, last))
-
         inserted = []
         for i in range(len(temp) - 1):
             gap = temp[i + 1] - temp[i]
@@ -124,7 +121,6 @@ class Sample:
             if n_miss > 0:
                 for j in range(1, n_miss + 1):
                     inserted.append(temp[i] + j * self.interframe_interval)
-
         if inserted:
             frame_ts = np.sort(np.concatenate((temp, np.array(inserted))))
         else:
@@ -132,25 +128,20 @@ class Sample:
         return frame_ts
 
     def _handle_assumed_frames(self, mat_file: Optional[Union[str, Path]]) -> np.ndarray:
-        """For unreliable animals (e.g. CTL1) – use empty.mat template or fall back to regular grid."""
         if mat_file is None:
             n = self.num_frames * self._frame_averaging
             return np.arange(n) * self.interframe_interval
-
         try:
             data = sio.loadmat(str(mat_file))
             log = np.squeeze(data["eventlog"])
             if log.ndim == 1:
                 log = log[:, np.newaxis]
-
             max_t = np.max(log[:, 1])
             n_rows = log.shape[0]
             tri = np.vstack((log, log, log))
             tri[n_rows:, 1] += max_t
             tri[2 * n_rows:, 1] += 2 * max_t
-
             frame_ts = tri[tri[:, 0] == 9, 1]
-
             diffs = np.diff(frame_ts)
             drop_idx = np.where(diffs > 1.5 * self.interframe_interval)[0]
             inserted = []
@@ -160,49 +151,47 @@ class Sample:
                 if n_drop > 0:
                     for a in range(1, n_drop + 1):
                         inserted.append(frame_ts[idx] + a * self.interframe_interval)
-
             if inserted:
                 frame_ts = np.sort(np.concatenate((frame_ts, np.array(inserted))))
         except Exception as e:
             print(f"Correction file failed ({e}); falling back to regular grid")
             n = self.num_frames * self._frame_averaging
             frame_ts = np.arange(n) * self.interframe_interval
-
         return frame_ts
 
     def _get_frame_timestamps(self) -> np.ndarray:
-        """Return timestamps (ms) for every *averaged* signal frame."""
         if self._averaged_frame_ts is not None:
             return self._averaged_frame_ts
-
         raw = self._event_log.get_raw_data()
         frame_ts_raw = raw[raw[:, 0] == 9, 1]
-
         if self._frame_correction:
             full_ts = self._handle_assumed_frames(self._correction_file)
         else:
             full_ts = self._handle_missed_frames(frame_ts_raw)
-
         averaged_ts = full_ts[::self._frame_averaging]
-
         if self.num_frames != len(averaged_ts):
             print(f"Warning: signal frames ({self.num_frames}) ≠ timestamp frames ({len(averaged_ts)}). "
                   "Trimmed signals in this case.")
-
         self._averaged_frame_ts = averaged_ts
         return averaged_ts
 
     def get_dataframe(self) -> pd.DataFrame:
         df = self._event_log.get_dataframe().copy()
-
         frame_ts = self._get_frame_timestamps()
         event_ts = df["t1"].values
-
         indices = np.searchsorted(frame_ts, event_ts, side="right") - 1
         indices = np.clip(indices, 0, len(frame_ts) - 1)
-
         df["frame_index"] = indices.astype(np.int64)
         return df
+
+    def get_event_dict(self) -> Dict[int, str]:
+        return self._event_dict
+
+    def get_signals(self):
+        return self._signals.get_signals()
+
+    def get_event_log(self):
+        return self._event_log.get_raw_data()
 
     def __str__(self):
         name = f"Name: {self.name}"
@@ -226,20 +215,14 @@ class Sample:
         return f"{name}\n{event_source}\n{signal_source}\n{fps}\n{averaging}\n{n_neurons}\n{n_frames}\n{n_events}"
 
 if __name__ == "__main__":
-    event_dict = {
-        22: "active_lever",
-        222: "active_lever_timeout",
-        21: "inactive_lever",
-        212: "inactive_lever_timeout",
-        7: "cue",
-        4: "infusion",
-    }
+    from brew.config.events import LEGACY_HER
+
     sample = Sample(
         event_data=[r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat",
                     r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"],
         signal_data=[r"../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy",
                      r"../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"],
-        event_dict=event_dict,
+        event_dict=LEGACY_HER,
         fps=30,
         frame_averaging=4,
         frame_correction=True,

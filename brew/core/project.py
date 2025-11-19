@@ -1,7 +1,6 @@
 # project.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
-
 """
 Encapsulates a project of behavioral and neural fluorescence data.
 
@@ -13,18 +12,19 @@ of project information.
 """
 
 from typing import List
-from population import Population
+from brew.core.population import Population
+from brew.core.sample import Sample
 
 
 class Project:
     def __init__(
             self,
-            name: str = "Project",
+            name: str | None = None,
             populations: List[Population] = None,
             authors: List[str] = None,
             description: str = None,
     ):
-        self._name = name
+        self._name = name or self.__class__.__name__
         self._populations = populations
         self._authors = authors
         self._description = description
@@ -56,8 +56,6 @@ class Project:
         return f"{name}\n{desc}\n{populations}"
 
 if __name__ == "__main__":
-    from sample import Sample
-
     event_dict = {
         22: "active_lever",
         222: "active_lever_timeout",

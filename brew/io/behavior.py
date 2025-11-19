@@ -1,7 +1,6 @@
 # behavior.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
-
 """
 Module to handle event logs derived from MATLAB files or CSVs. Provides functionalities
 to parse, process, and export the event log into human-readable formats using pandas.
@@ -31,14 +30,13 @@ class EventLog:
     def __init__(
         self,
         source: List[Union[str, Path]] | Union[str, Path] | str,
-        name: str = "Event Log",
+        name: str | None = None,
         event_dict: Optional[Dict[int, str]] = None,
     ):
-        self._name = name
+        self._name = name or self.__class__.__name__
         self._source = source
         self._event_log = None
         self._event_dict = event_dict
-
         if isinstance(source, str) or isinstance(source, Path):
             if os.path.isfile(source):
                 if source.endswith(".mat"):
@@ -56,23 +54,19 @@ class EventLog:
 
     @property
     def name(self) -> str:
-        """Returns the name of the event log."""
         return self._name
 
     @property
     def source(self) -> Union[str, Path] | List[Union[str, Path]] | str:
-        """Returns the source of the event log."""
         return self._source
 
     @property
     def num_events(self) -> int:
-        """Returns the number of events in the event log."""
         return len(self._event_log)
 
     @staticmethod
     @deprecated("DEPRECATED: Use of MATLAB-produced event logs for the 'event_log' parameter is deprecated and will be removed in a future version.")
     def __load_mat_file__(path: Union[str, Path]) -> NDArray[Any]:
-        """Loads a MATLAB file and returns the event log as a numpy array."""
         if os.path.exists(path) and os.path.isfile(path):
             if path.endswith(".mat"):
                 mat_file = sio.loadmat(path)
@@ -86,7 +80,6 @@ class EventLog:
 
     @deprecated("DEPRECATED: Use only for compatibility with older versions of the library.")
     def __compile_mat_files__(self, paths: List[Union[str, Path]]) -> NDArray[Any]:
-        """Concatenates multiple MATLAB files into a single event log."""
         paths = [str(f) for f in paths]
         stack = []
         last_timestamp = 0
@@ -105,7 +98,6 @@ class EventLog:
         return stack
 
     def __create_event_log__(self) -> pd.DataFrame:
-        """Creates a human-readable table from the event log. The table contains the following columns: code, t1, t2, label."""
         log = np.asarray(self._raw_data)
         n_rows, n_cols = log.shape
 
@@ -113,14 +105,11 @@ class EventLog:
             "code": log[:, 0].astype(int),
             "t1": log[:, 1],  # µs
         }
-
         if n_cols > 2:
             data["t2"] = log[:, 2]  # µs
         else:
             data["t2"] = np.nan
-
         df = pd.DataFrame(data, index=range(n_rows))
-
         if self._event_dict is not None:
             df["label"] = df["code"].map(self._event_dict)
             df = df.dropna(subset=["label"])
@@ -129,19 +118,15 @@ class EventLog:
         return df
 
     def get_dataframe(self) -> pd.DataFrame:
-        """Returns the event log as a pandas DataFrame."""
         return self._event_log
 
     def get_code_dict(self) -> Dict[int, str]:
-        """Returns a dictionary mapping event codes to event labels."""
         return self._event_dict
 
     def get_raw_data(self) -> NDArray[Any]:
-        """Returns the event log as a numpy array."""
         return self._raw_data
 
     def count_events(self, target: int | str = None) -> int:
-        """Returns the number of events in the event log."""
         if target is None:
             return len(self._event_log)
         else:

@@ -1,7 +1,6 @@
 # microscopy.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
-
 """
 Provides the SignalRecording class for handling neural fluorescence recordings.
 
@@ -29,9 +28,9 @@ class SignalRecording:
     def __init__(
         self,
         source: List[Union[str, Path]] | Union[str, Path] | str,
-        name: str = "Signal Recording",
+        name: str | None = None,
     ):
-        self._name = name
+        self._name = name or self.__class__.__name__
         self._source = source
 
         if isinstance(source, list):
@@ -41,27 +40,22 @@ class SignalRecording:
 
     @property
     def name(self) -> str:
-        """Returns the name of the signal recording."""
         return self._name
 
     @property
     def source(self) -> Union[str, Path] | List[Union[str, Path]] | str:
-        """Returns the source of the signal recording."""
         return self._source
 
     @property
     def num_neurons(self) -> int:
-        """Returns the number of neurons in the signal recording."""
         return self._signals.shape[0]
 
     @property
     def num_frames(self) -> int:
-        """Returns the number of timepoints in the signal recording."""
         return self._signals.shape[1]
 
     @staticmethod
     def __load_npy_file__(path: Union[str, Path]) -> NDArray[Any]:
-        """Loads a numpy file and returns the signals as a numpy array."""
         if os.path.exists(path) and os.path.isfile(path):
             if path.endswith(".npy"):
                 with warnings.catch_warnings(record=True) as captured_warnings:
@@ -76,7 +70,6 @@ class SignalRecording:
         return npy_file
 
     def __compile_npy_files__(self, paths: List[Union[str, Path]]) -> NDArray[Any]:
-        """Concatenates multiple numpy files into a single signal recording."""
         stack = []
         if isinstance(paths, list) and len(paths) > 0:
             for file in sorted(paths):
@@ -84,7 +77,6 @@ class SignalRecording:
         return np.hstack(stack).squeeze() if len(stack) > 0 else np.array(stack)
 
     def get_signals(self) -> NDArray[Any]:
-        """Returns the signals of the signal recording."""
         return self._signals
 
     def __str__(self):

@@ -1,7 +1,6 @@
 # peri_event.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
-
 """
 Peri-event trace extraction — clean, composable, database-future-proof.
 
@@ -12,27 +11,28 @@ Contains:
 
 import numpy as np
 from numpy.typing import NDArray
-from typing import Literal, Sequence, overload
-
 from brew.core.sample import Sample
-from brew.core.population import Population
 
 
-class PETH: # Peri-Event Trace Histogram
+class PeriEventTraces:
     def __init__(
         self,
         sample: Sample,
-        event_dict: dict,
-        event_names: Sequence[str],
-        event_bins: Sequence[int],
-        event_hist_type: Literal["count", "density"] = "count",
-        event_hist_norm: Literal["none", "percent", "density"] = "none",
-        event_hist_log: bool = False,
     ):
         self._sample = sample
-        self._event_dict = event_dict
-        self._event_names = event_names
-        self._event_bins = event_bins
-        self._event_hist_type = event_hist_type
-        self._event_hist_norm = event_hist_norm
-        self._event_hist_log = event_hist_log
+
+    def _sec_to_frames(self, s: int) -> int:
+        return int(s * self._sample.fps)
+
+    def get_event_windows(self, event_id: int, pre_event: int, post_event: int) -> NDArray[np.float32]:
+        df = self._sample.get_dataframe()
+        signals = self._sample.get_signals()
+        event_frame_indices = df["frame_index"][df["code"] == event_id]
+        pre_frames = self._sec_to_frames(pre_event)
+        post_frames = self._sec_to_frames(post_event)
+        windows = []
+        for frame_index in event_frame_indices:
+            window = signals[:, frame_index - pre_frames:frame_index + post_frames + 1]
+            windows.append(window)
+        windows = np.array(windows)
+        return windows

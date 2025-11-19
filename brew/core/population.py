@@ -1,7 +1,6 @@
 # population.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
-
 """
 Encapsulates a population of samples.
 
@@ -16,19 +15,19 @@ Classes:
 """
 
 from typing import List
-from sample import Sample
+from brew.core.sample import Sample
 
 
 class Population:
     def __init__(
         self,
         samples: List[Sample],
-        name: str = "Population",
+        name: str | None = None,
         description: str = None,
     ):
         self._samples = samples
         self._description = description
-        self._name = name
+        self._name = name or self.__class__.__name__
 
     @property
     def name(self):
@@ -68,21 +67,15 @@ class Population:
         return f"{name}\n{desc}\n{samples}"
 
 if __name__ == "__main__":
-    event_dict = {
-        22: "active_lever",
-        222: "active_lever_timeout",
-        21: "inactive_lever",
-        212: "inactive_lever_timeout",
-        7: "cue",
-        4: "infusion",
-    }
+    from brew.config.events import LEGACY_HER
+
     s1 = Sample(
         name="Sample 1",
         event_data=[r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat",
                     r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"],
         signal_data=[r"../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy",
                      r"../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"],
-        event_dict=event_dict,
+        event_dict=LEGACY_HER,
         fps=30,
         frame_averaging=4,
         frame_correction=True,
@@ -95,7 +88,7 @@ if __name__ == "__main__":
                     r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"],
         signal_data=[r"../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy",
                      r"../../data/0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"],
-        event_dict=event_dict,
+        event_dict=LEGACY_HER,
         fps=30,
         frame_averaging=4,
         frame_correction=True,
