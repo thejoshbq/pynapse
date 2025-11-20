@@ -2,37 +2,49 @@
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
 """
-Peri-event trace extraction — clean, composable, database-future-proof.
+A module to extract peri-event signal windows from sample data.
 
-Contains:
-  - PeriEventTraces                single Sample/FOV
-  - PopulationPeriEventTraces   multiple Samples (Population or list)
+This module provides functionality for handling peri-event traces based
+on a given list of samples. The key features include calculating windows
+of signal data centered around specified events and converting time in
+seconds to frame indices based on the sampling frequency.
+
+Classes:
+- PeriEventTraces: Handles peri-event trace extraction utilities.
 """
 
 import numpy as np
 from numpy.typing import NDArray
 from brew.core.sample import Sample
+from typing import List
 
 
 class PeriEventTraces:
     def __init__(
         self,
-        sample: Sample,
+        samples: Sample | List[Sample],
     ):
-        self._sample = sample
+        if isinstance(samples, Sample):
+            samples = [samples]
+        self._samples = samples
 
-    def _sec_to_frames(self, s: int) -> int:
-        return int(s * self._sample.fps)
+    @staticmethod
+    def _sec_to_frames(s: int, fps: int) -> int:
+        return int(s * fps)
 
     def get_event_windows(self, event_id: int, pre_event: int, post_event: int) -> NDArray[np.float32]:
-        df = self._sample.get_dataframe()
-        signals = self._sample.get_signals()
-        event_frame_indices = df["frame_index"][df["code"] == event_id]
-        pre_frames = self._sec_to_frames(pre_event)
-        post_frames = self._sec_to_frames(post_event)
         windows = []
-        for frame_index in event_frame_indices:
-            window = signals[:, frame_index - pre_frames:frame_index + post_frames + 1]
-            windows.append(window)
-        windows = np.array(windows)
+        for sample in self._samples:
+            df = sample.get_dataframe()
+            signals = sample.get_signals()
+            fps = sample.fps
+            event_frame_indices = df["frame_index"][df["code"] == event_id]
+            pre_frames = self._sec_to_frames(pre_event, fps)
+            post_frames = self._sec_to_frames(post_event, fps)
+            window_size = pre_frames + post_frames
+            for frame_index in event_frame_indices:
+                window = np.array(signals[:, frame_index - pre_frames:frame_index + post_frames])
+                if window.shape[1] != window_size:
+                    continue
+                windows.append(window)
         return windows
