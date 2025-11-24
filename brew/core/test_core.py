@@ -1,4 +1,4 @@
-# test.py
+# test_core.py
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
 
@@ -6,9 +6,8 @@ from brew.core.project import *
 from brew.analysis.peri_event import *
 import os
 from brew.config.events import LEGACY_HER
-from brew.analysis.peri_event import PeriEventTraces
 
-def build_project(basedir: str):
+def test_core(basedir: str):
     population_names = [p for p in os.listdir(basedir) if os.path.isdir(os.path.join(basedir, p))]
     populations = []
     for p in population_names:
@@ -48,7 +47,7 @@ def build_project(basedir: str):
     return p
 
 if __name__ == "__main__":
-    test_project = build_project(r"../../data")
+    test_project = test_core(r"../../data")
     print(test_project)
     for pop in test_project.get_populations():
         print(pop)

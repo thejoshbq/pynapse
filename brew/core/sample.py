@@ -23,8 +23,8 @@ import pandas as pd
 import scipy.io as sio
 from typing import Dict, List, Optional, Union
 from pathlib import Path
-from brew.io.behavior import EventLog
-from brew.io.microscopy import SignalRecording
+from brew.core.io.behavior import EventLog
+from brew.core.io.microscopy import SignalRecording
 
 
 class Sample:

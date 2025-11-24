@@ -10,41 +10,55 @@ of signal data centered around specified events and converting time in
 seconds to frame indices based on the sampling frequency.
 
 Classes:
-- PeriEventTraces: Handles peri-event trace extraction utilities.
+- EventMatrix: Handles peri-event trace extraction utilities.
 """
 
 import numpy as np
 from numpy.typing import NDArray
+
+from brew.analysis.preprocessing import Preprocessor
 from brew.core.sample import Sample
-from typing import List
 
 
-class PeriEventTraces:
+class EventMatrix:
     def __init__(
         self,
-        samples: Sample | List[Sample],
+        sample: Sample,
+        event_id: int,
+        pre_event: float,
+        post_event: float,
+        downsample: bool = False,
     ):
-        if isinstance(samples, Sample):
-            samples = [samples]
-        self._samples = samples
+        self._sample = sample
+        self._signals = sample.get_signals().copy()
+        self._event_id = event_id
+        self._pre_event = pre_event
+        self._post_event = post_event
+        self._downsample = downsample
+        self._matrix = self.__extract_event_windows__()
 
     @staticmethod
-    def _sec_to_frames(s: int, fps: int) -> int:
+    def _sec_to_frames(s: float, fps: float) -> int:
         return int(s * fps)
 
-    def get_event_windows(self, event_id: int, pre_event: int, post_event: int) -> NDArray[np.float32]:
+    def __extract_event_windows__(self) -> NDArray:
         windows = []
-        for sample in self._samples:
-            df = sample.get_dataframe()
-            signals = sample.get_signals()
-            fps = sample.fps
-            event_frame_indices = df["frame_index"][df["code"] == event_id]
-            pre_frames = self._sec_to_frames(pre_event, fps)
-            post_frames = self._sec_to_frames(post_event, fps)
-            window_size = pre_frames + post_frames
-            for frame_index in event_frame_indices:
-                window = np.array(signals[:, frame_index - pre_frames:frame_index + post_frames])
-                if window.shape[1] != window_size:
-                    continue
-                windows.append(window)
-        return windows
+        df = self._sample.get_dataframe()
+        signals = self._sample.get_signals()
+        if self._downsample:
+            fps = self._sample.effective_fps
+        else:
+            fps = self._sample.fps
+        event_frame_indices = df["frame_index"][df["code"] == self._event_id]
+        pre_frames = self._sec_to_frames(self._pre_event, fps)
+        post_frames = self._sec_to_frames(self._post_event, fps)
+        window_size = pre_frames + post_frames
+        for frame_index in event_frame_indices:
+            window = np.array(signals[:, frame_index - pre_frames:frame_index + post_frames])
+            if window.shape[1] != window_size:
+                continue
+            windows.append(window)
+        return np.stack(windows)
+
+    def get_event_windows(self) -> NDArray:
+        return self._matrix
