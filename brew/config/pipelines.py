@@ -20,7 +20,6 @@ from brew.analysis.preprocessing import (
 OTIS_PIPE = ProcessingPipeline(
     steps=[
         DFOverF(percentile=8),
-        GaussianSmoothing(sigma_frames=1),
         ZScore(window_ms=(-3000.0, -500.0)),
     ]
 )
