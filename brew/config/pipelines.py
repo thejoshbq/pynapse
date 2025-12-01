@@ -21,6 +21,7 @@ OTIS_PIPE = ProcessingPipeline(
     steps=[
         DFOverF(percentile=8),
         ZScore(window_ms=(-3000.0, -500.0)),
+        GaussianSmoothing()
     ]
 )
 

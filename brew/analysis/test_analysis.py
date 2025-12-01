@@ -11,9 +11,11 @@ import numpy as np
 import seaborn as sns
 from scipy import stats
 
+
 def test_analysis(basedir: str):
     sample_names = [s for s in os.listdir(basedir) if os.path.isdir(os.path.join(basedir, s))]
     windows = []
+    raw_windows = []
     for s in sample_names:
         sample_dir = os.path.join(basedir, s)
         FOVs = [f for f in os.listdir(sample_dir) if os.path.isdir(os.path.join(sample_dir, f))]
@@ -32,18 +34,24 @@ def test_analysis(basedir: str):
                     correction_file=r"./data/empty.mat",
                     event_dict=LEGACY_HER
                 )
-                matrix = EventMatrix(sample, 22, 10, 11.6, True)
+                matrix = EventMatrix(
+                    sample,
+                    event_id=22,
+                    pre_event=10,
+                    post_event=11.6,
+                    downsample=True,
+                    min_events=3
+                )
                 raw = matrix.get_event_windows()
-                pipe = ProcessingPipeline([
-                    DFOverF(percentile=8),
-                    ZScore(window_ms=(-3000, -500), frame_duration_ms=1000 / sample.effective_fps),
-                    GaussianSmoothing(sigma_frames=2)
-                ])
-                windows.append(pipe(raw))
+                pipe = LEGACY_PIPE
+                processed = pipe(raw)
+                windows.append(processed)
+                raw_windows.append(raw)
             except Exception as e:
                 print(f"Sample {s} failed ({e}); skipping")
                 continue
-    return windows
+    return windows, raw_windows
+
 
 if __name__ == "__main__":
     plt.style.use('default')
@@ -55,36 +63,55 @@ if __name__ == "__main__":
     day_labels = ["EarlyAcq", "MidAcq", "LateAcq", "EarlyExt", "LastExt", "CueRein", "DrugRein", "TMTRein"]
     event_frame = 75
     time_vec = np.linspace(-10, 11.6, 162)
-    all_traces = []
-    all_sems = []
+
+    all_raw_traces = []
+    all_raw_sems = []
+    all_processed_traces = []
+    all_processed_sems = []
     all_n = []
     stats_out = []
+
     for day_idx, day_folder in enumerate(
             sorted([d for d in os.listdir("./data") if os.path.isdir(f"./data/{d}")])):
         if not any(l in day_folder for l in day_labels):
             continue
         path = f"./data/{day_folder}"
         try:
-            windows = test_analysis(path)
+            windows, raw_windows = test_analysis(path)
             if not windows:
                 continue
-        except:
+        except Exception as e:
+            print(e)
             continue
-        neuron_traces = [np.nanmean(w, axis=0) for w in windows]
-        full_matrix = np.vstack(neuron_traces)
-        post_resp = np.mean(full_matrix[:, event_frame + 5:event_frame + 40], axis=1)
+
+        raw_neuron_traces = [np.nanmean(w, axis=0) for w in raw_windows]
+        raw_full_matrix = np.vstack(raw_neuron_traces)
+
+        processed_neuron_traces = [np.nanmean(w, axis=0) for w in windows]
+        processed_full_matrix = np.vstack(processed_neuron_traces)
+
+        post_resp = np.mean(processed_full_matrix[:, event_frame + 5:event_frame + 40], axis=1)
         sort_idx = np.argsort(-post_resp)
-        sorted_matrix = full_matrix[sort_idx]
-        trace = np.mean(sorted_matrix, axis=0)
-        sem = stats.sem(sorted_matrix, axis=0)
-        all_traces.append(trace)
-        all_sems.append(sem)
-        all_n.append(sorted_matrix.shape[0])
-        pre = trace[event_frame - 30:event_frame]
-        post = trace[event_frame:event_frame + 30]
+
+        raw_sorted_matrix = raw_full_matrix[sort_idx]
+        processed_sorted_matrix = processed_full_matrix[sort_idx]
+
+        raw_trace = np.mean(raw_sorted_matrix, axis=0)
+        raw_sem = stats.sem(raw_sorted_matrix, axis=0)
+        processed_trace = np.mean(processed_sorted_matrix, axis=0)
+        processed_sem = stats.sem(processed_sorted_matrix, axis=0)
+
+        all_raw_traces.append(raw_trace)
+        all_raw_sems.append(raw_sem)
+        all_processed_traces.append(processed_trace)
+        all_processed_sems.append(processed_sem)
+        all_n.append(processed_sorted_matrix.shape[0])
+
+        pre = processed_trace[event_frame - 30:event_frame]
+        post = processed_trace[event_frame:event_frame + 30]
         delta = np.mean(post) - np.mean(pre)
         d = delta / np.sqrt((np.std(pre) ** 2 + np.std(post) ** 2) / 2)
-        _, p = stats.ttest_rel(post, pre)
+        _, p = stats.ttest_rel(post, pre)  # Paired t-test (assumes dependent samples)
         p = p if not np.isnan(p) else 1.0
         stats_out.append({
             'day': day_labels[day_idx],
@@ -93,26 +120,36 @@ if __name__ == "__main__":
             'p': p,
             'sig': '**' if p < 0.01 else '*' if p < 0.05 else 'n.s.'
         })
-    fig, axes = plt.subplots(2, 4, figsize=(16, 8), sharex=True, sharey=True)
+
+    fig, axes = plt.subplots(2, 8, figsize=(16, 8), sharex=True)
     axes = axes.flatten()
-    for i, (trace, sem, n) in enumerate(zip(all_traces, all_sems, all_n)):
+
+    for i, (raw_trace, raw_sem, n) in enumerate(zip(all_raw_traces, all_raw_sems, all_n)):
         ax = axes[i]
-        ax.fill_between(time_vec, trace - sem, trace + sem, color=colors[i], alpha=0.3)
-        ax.plot(time_vec, trace, color=colors[i], lw=3, label=f"n={n:,}")
+        ax.fill_between(time_vec, raw_trace - raw_sem, raw_trace + raw_sem,
+                        color=colors[i], alpha=0.3)
+        ax.plot(time_vec, raw_trace, color=colors[i], lw=3, label=f"n={n:,}")
         ax.axvline(0, color='black', lw=2, linestyle='--')
         ax.axhline(0, color='gray', lw=1, linestyle=':')
         ax.set_title(day_labels[i], fontsize=16, pad=15)
-        ax.set_ylim(-0.15, 0.12)
-    for ax in axes[len(all_traces):]:
-        ax.set_visible(False)
-    for ax in axes[4:]:
-        ax.set_xlabel("Time from lever press (s)", fontsize=14)
-    for ax in axes[::4]:
-        ax.set_ylabel("ΔF/F (z-scored)", fontsize=14)
-    plt.suptitle("PFC Lever Press Responses — Heroin Self-Administration", fontsize=20, y=0.98)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        ax.set_ylim(.85, 1.12)
 
+    for i, (processed_trace, processed_sem, n) in enumerate(zip(all_processed_traces, all_processed_sems, all_n)):
+        ax = axes[8 + i]
+        ax.fill_between(time_vec, processed_trace - processed_sem, processed_trace + processed_sem,
+                        color=colors[i], alpha=0.3)
+        ax.plot(time_vec, processed_trace, color=colors[i], lw=3, label=f"n={n:,}")
+        ax.axvline(0, color='black', lw=2, linestyle='--')
+        ax.axhline(0, color='gray', lw=1, linestyle=':')
+        ax.set_ylim(-0.15, 0.12)
+
+    axes[0].set_ylabel("Raw Fluorescence (a.u.)", fontsize=14)
+    axes[8].set_ylabel("ΔF/F (z-scored)", fontsize=14)
+
+    plt.suptitle("PFC Lever Press Responses — Heroin Self-Administration\n(Raw vs. Processed)", fontsize=20, y=0.95)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
-    print("Stats:")
+
+    print("Stats (Processed Data):")
     for s in stats_out:
         print(f"{s['day']:10} Δ = {s['delta']:+.4f}, d = {s['d']:+.3f}, p = {s['p']:.3f} {s['sig']}")

@@ -16,7 +16,6 @@ Classes:
 import numpy as np
 from numpy.typing import NDArray
 
-from brew.analysis.preprocessing import Preprocessor
 from brew.core.sample import Sample
 
 
@@ -28,6 +27,8 @@ class EventMatrix:
         pre_event: float,
         post_event: float,
         downsample: bool = False,
+        min_events: int = 1,
+        overlap: int = 1
     ):
         self._sample = sample
         self._signals = sample.get_signals().copy()
@@ -35,6 +36,8 @@ class EventMatrix:
         self._pre_event = pre_event
         self._post_event = post_event
         self._downsample = downsample
+        self._min_events = min_events
+        self._overlap = overlap
         self._matrix = self.__extract_event_windows__()
 
     @staticmethod
@@ -50,6 +53,9 @@ class EventMatrix:
         else:
             fps = self._sample.fps
         event_frame_indices = df["frame_index"][df["code"] == self._event_id]
+        if len(event_frame_indices) < self._min_events:
+            intended_window_size = self._sec_to_frames(self._pre_event + self._post_event, fps)
+            return np.empty((0, intended_window_size))
         pre_frames = self._sec_to_frames(self._pre_event, fps)
         post_frames = self._sec_to_frames(self._post_event, fps)
         window_size = pre_frames + post_frames
