@@ -11,11 +11,15 @@ import numpy as np
 import seaborn as sns
 from scipy import stats
 
+from brew.core import Population
+from brew.analysis.peri_event import *
+
 
 def test_analysis(basedir: str):
     sample_names = [s for s in os.listdir(basedir) if os.path.isdir(os.path.join(basedir, s))]
     windows = []
     raw_windows = []
+    samples = []
     for s in sample_names:
         sample_dir = os.path.join(basedir, s)
         FOVs = [f for f in os.listdir(sample_dir) if os.path.isdir(os.path.join(sample_dir, f))]
@@ -34,122 +38,49 @@ def test_analysis(basedir: str):
                     correction_file=r"./data/empty.mat",
                     event_dict=LEGACY_HER
                 )
-                matrix = EventMatrix(
-                    sample,
-                    event_id=22,
-                    pre_event=10,
-                    post_event=11.6,
-                    downsample=True,
-                    min_events=3
-                )
-                raw = matrix.get_event_windows()
-                pipe = LEGACY_PIPE
-                processed = pipe(raw)
-                windows.append(processed)
-                raw_windows.append(raw)
+                samples.append(sample)
             except Exception as e:
                 print(f"Sample {s} failed ({e}); skipping")
                 continue
-    return windows, raw_windows
+    population = Population(name=basedir, samples=samples)
+    population_tensor = PopulationEventTensor(population, 22, 10, 11.6, min_trials=3, buffer_ms=1000)
+    event_windows = population_tensor.get_event_windows()
+    return event_windows
 
 
 if __name__ == "__main__":
-    plt.style.use('default')
-    sns.set_context("paper", font_scale=1.6)
-    sns.set_style("whitegrid")
-
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
-              '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
-    day_labels = ["EarlyAcq", "MidAcq", "LateAcq", "EarlyExt", "LastExt", "CueRein", "DrugRein", "TMTRein"]
-    event_frame = 75
-    time_vec = np.linspace(-10, 11.6, 162)
-
-    all_raw_traces = []
-    all_raw_sems = []
-    all_processed_traces = []
-    all_processed_sems = []
-    all_n = []
-    stats_out = []
-
-    for day_idx, day_folder in enumerate(
-            sorted([d for d in os.listdir("./data") if os.path.isdir(f"./data/{d}")])):
-        if not any(l in day_folder for l in day_labels):
-            continue
-        path = f"./data/{day_folder}"
-        try:
-            windows, raw_windows = test_analysis(path)
-            if not windows:
+    basedir = r"./data/"
+    mean_windows = {}
+    pipe = LEGACY_PIPE
+    for population in os.listdir(basedir):
+        mean_windows[population] = {}
+        if os.path.isdir(os.path.join(basedir, population)):
+            processed_population_mean_windows = []
+            unprocessed_population_mean_windows = []
+            population_event_windows = test_analysis(os.path.join(basedir, population))
+            if not population_event_windows or len(population_event_windows) == 0:
+                print(f"Population {population}: No valid event windows found; skipping")
                 continue
-        except Exception as e:
-            print(e)
-            continue
+            for sample_event_window_set in population_event_windows:
+                processed = np.nanmean(pipe(sample_event_window_set), axis=(0, 1))
+                unprocessed = np.nanmean(sample_event_window_set, axis=(0, 1))
+                processed_population_mean_windows.append(processed)
+                unprocessed_population_mean_windows.append(unprocessed)
+            if processed_population_mean_windows and unprocessed_population_mean_windows:
+                mean_windows[population]["processed"] = np.nanmean(processed_population_mean_windows, axis=0)
+                mean_windows[population]["unprocessed"] = np.nanmean(unprocessed_population_mean_windows, axis=0)
+            else:
+                print(f"Population {population}: No mean windows calculated; skipping")
+                continue
+    mean_windows = {k: v for k, v in mean_windows.items() if "processed" in v and "unprocessed" in v}
+    if not mean_windows:
+        print("No valid populations with complete data found.")
+    else:
+        fig, axs = plt.subplots(2, len(mean_windows), figsize=(16, 6))
+        for i, (key, data) in enumerate(mean_windows.items()):
+            axs[0, i].plot(data["unprocessed"])
+            axs[0, i].set_title(key)
+            axs[1, i].plot(data["processed"])
+        plt.tight_layout()
+        plt.show()
 
-        raw_neuron_traces = [np.nanmean(w, axis=0) for w in raw_windows]
-        raw_full_matrix = np.vstack(raw_neuron_traces)
-
-        processed_neuron_traces = [np.nanmean(w, axis=0) for w in windows]
-        processed_full_matrix = np.vstack(processed_neuron_traces)
-
-        post_resp = np.mean(processed_full_matrix[:, event_frame + 5:event_frame + 40], axis=1)
-        sort_idx = np.argsort(-post_resp)
-
-        raw_sorted_matrix = raw_full_matrix[sort_idx]
-        processed_sorted_matrix = processed_full_matrix[sort_idx]
-
-        raw_trace = np.mean(raw_sorted_matrix, axis=0)
-        raw_sem = stats.sem(raw_sorted_matrix, axis=0)
-        processed_trace = np.mean(processed_sorted_matrix, axis=0)
-        processed_sem = stats.sem(processed_sorted_matrix, axis=0)
-
-        all_raw_traces.append(raw_trace)
-        all_raw_sems.append(raw_sem)
-        all_processed_traces.append(processed_trace)
-        all_processed_sems.append(processed_sem)
-        all_n.append(processed_sorted_matrix.shape[0])
-
-        pre = processed_trace[event_frame - 30:event_frame]
-        post = processed_trace[event_frame:event_frame + 30]
-        delta = np.mean(post) - np.mean(pre)
-        d = delta / np.sqrt((np.std(pre) ** 2 + np.std(post) ** 2) / 2)
-        _, p = stats.ttest_rel(post, pre)  # Paired t-test (assumes dependent samples)
-        p = p if not np.isnan(p) else 1.0
-        stats_out.append({
-            'day': day_labels[day_idx],
-            'delta': delta,
-            'd': d,
-            'p': p,
-            'sig': '**' if p < 0.01 else '*' if p < 0.05 else 'n.s.'
-        })
-
-    fig, axes = plt.subplots(2, 8, figsize=(16, 8), sharex=True)
-    axes = axes.flatten()
-
-    for i, (raw_trace, raw_sem, n) in enumerate(zip(all_raw_traces, all_raw_sems, all_n)):
-        ax = axes[i]
-        ax.fill_between(time_vec, raw_trace - raw_sem, raw_trace + raw_sem,
-                        color=colors[i], alpha=0.3)
-        ax.plot(time_vec, raw_trace, color=colors[i], lw=3, label=f"n={n:,}")
-        ax.axvline(0, color='black', lw=2, linestyle='--')
-        ax.axhline(0, color='gray', lw=1, linestyle=':')
-        ax.set_title(day_labels[i], fontsize=16, pad=15)
-        ax.set_ylim(.85, 1.12)
-
-    for i, (processed_trace, processed_sem, n) in enumerate(zip(all_processed_traces, all_processed_sems, all_n)):
-        ax = axes[8 + i]
-        ax.fill_between(time_vec, processed_trace - processed_sem, processed_trace + processed_sem,
-                        color=colors[i], alpha=0.3)
-        ax.plot(time_vec, processed_trace, color=colors[i], lw=3, label=f"n={n:,}")
-        ax.axvline(0, color='black', lw=2, linestyle='--')
-        ax.axhline(0, color='gray', lw=1, linestyle=':')
-        ax.set_ylim(-0.15, 0.12)
-
-    axes[0].set_ylabel("Raw Fluorescence (a.u.)", fontsize=14)
-    axes[8].set_ylabel("ΔF/F (z-scored)", fontsize=14)
-
-    plt.suptitle("PFC Lever Press Responses — Heroin Self-Administration\n(Raw vs. Processed)", fontsize=20, y=0.95)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
-
-    print("Stats (Processed Data):")
-    for s in stats_out:
-        print(f"{s['day']:10} Δ = {s['delta']:+.4f}, d = {s['d']:+.3f}, p = {s['p']:.3f} {s['sig']}")

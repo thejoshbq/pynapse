@@ -27,8 +27,6 @@ OTIS_PIPE = ProcessingPipeline(
 
 LEGACY_PIPE = ProcessingPipeline(
     steps=[
-        BaselineSubtraction(method="median", window_ms=None),
-        DFOverF(percentile=8),
-        ZScore(window_ms=(-3000.0, -500.0)),
+        ZScore(window_ms=(-3000.0, -500.0), full_trace=True),
     ]
 )

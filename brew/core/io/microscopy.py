@@ -34,9 +34,9 @@ class SignalRecording:
         self._source = source
 
         if isinstance(source, list):
-            self._signals = self.__compile_npy_files__(source)
+            self._signals = self._compile_npy_files(source)
         elif isinstance(source, str) or isinstance(source, Path):
-            self._signals = self.__load_npy_file__(source)
+            self._signals = self._load_npy_file(source)
 
     @property
     def name(self) -> str:
@@ -55,7 +55,7 @@ class SignalRecording:
         return self._signals.shape[1]
 
     @staticmethod
-    def __load_npy_file__(path: Union[str, Path]) -> NDArray[Any]:
+    def _load_npy_file(path: Union[str, Path]) -> NDArray[Any]:
         if os.path.exists(path) and os.path.isfile(path):
             if path.endswith(".npy"):
                 with warnings.catch_warnings(record=True) as captured_warnings:
@@ -69,11 +69,11 @@ class SignalRecording:
             raise ValueError("File does not exist.")
         return npy_file
 
-    def __compile_npy_files__(self, paths: List[Union[str, Path]]) -> NDArray[Any]:
+    def _compile_npy_files(self, paths: List[Union[str, Path]]) -> NDArray[Any]:
         stack = []
         if isinstance(paths, list) and len(paths) > 0:
             for file in sorted(paths):
-                stack.append(self.__load_npy_file__(file))
+                stack.append(self._load_npy_file(file))
         return np.hstack(stack).squeeze() if len(stack) > 0 else np.array(stack)
 
     def get_signals(self) -> NDArray[Any]:

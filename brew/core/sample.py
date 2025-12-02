@@ -19,6 +19,7 @@ Classes:
 """
 
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 import scipy.io as sio
 from typing import Dict, List, Optional, Union
@@ -102,6 +103,10 @@ class Sample:
     @property
     def start_time(self) -> float:
         return self._start_time
+
+    @staticmethod
+    def _sec_to_frames(s: float, fps: float) -> int:
+        return int(s * fps)
 
     def count_events(self, target: int | str = None) -> int:
         return self._event_log.count_events(target)
@@ -192,6 +197,13 @@ class Sample:
 
     def get_event_log(self):
         return self._event_log.get_raw_data()
+
+    def get_num_events(self, event_id: int) -> int:
+        return self._event_log.count_events(event_id)
+
+    def get_event_timestamps(self, event_id: int) -> NDArray:
+        df = self.get_dataframe()
+        return df[df["code"] == event_id]["t1"].values
 
     def __str__(self):
         name = f"Name: {self.name}"

@@ -41,7 +41,7 @@ class EventLog:
             if os.path.isfile(source):
                 if source.endswith(".mat"):
                     warnings.warn("Use of MATLAB-produced event logs for the 'event_log' parameter is deprecated and will be removed in a future version.", DeprecationWarning)
-                    self._raw_data = self.__load_mat_file__(source)
+                    self._raw_data = self._load_mat_file(source)
                 elif source.endswith(".csv"):
                     pass # FIXME: CSV reader to be implemented in future version
                 else:
@@ -49,8 +49,8 @@ class EventLog:
             else:
                 raise ValueError("File does not exist.")
         elif isinstance(source, List):
-            self._raw_data = self.__compile_mat_files__(source)
-        self._event_log = self.__create_event_log__()
+            self._raw_data = self._compile_mat_files(source)
+        self._event_log = self._create_event_log()
 
     @property
     def name(self) -> str:
@@ -66,7 +66,7 @@ class EventLog:
 
     @staticmethod
     @deprecated("DEPRECATED: Use of MATLAB-produced event logs for the 'event_log' parameter is deprecated and will be removed in a future version.")
-    def __load_mat_file__(path: Union[str, Path]) -> NDArray[Any]:
+    def _load_mat_file(path: Union[str, Path]) -> NDArray[Any]:
         if os.path.exists(path) and os.path.isfile(path):
             if path.endswith(".mat"):
                 mat_file = sio.loadmat(path)
@@ -79,13 +79,13 @@ class EventLog:
         return event_log
 
     @deprecated("DEPRECATED: Use only for compatibility with older versions of the library.")
-    def __compile_mat_files__(self, paths: List[Union[str, Path]]) -> NDArray[Any]:
+    def _compile_mat_files(self, paths: List[Union[str, Path]]) -> NDArray[Any]:
         paths = [str(f) for f in paths]
         stack = []
         last_timestamp = 0
         if isinstance(paths, list) and len(paths) > 0:
             for file in sorted(paths):
-                event_log = self.__load_mat_file__(file)
+                event_log = self._load_mat_file(file)
                 event_log[:, 1] = event_log[:, 1] + last_timestamp  # offset timestamps by the last timestamp
                 last_timestamp = np.max(event_log[:, 1])
                 stack.append(event_log[:, 0:2])
@@ -97,7 +97,7 @@ class EventLog:
                 stack = np.empty((0, 2))
         return stack
 
-    def __create_event_log__(self) -> pd.DataFrame:
+    def _create_event_log(self) -> pd.DataFrame:
         log = np.asarray(self._raw_data)
         n_rows, n_cols = log.shape
 
