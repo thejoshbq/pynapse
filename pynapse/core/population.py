@@ -15,7 +15,7 @@ Classes:
 """
 
 from typing import List
-from brew.core.sample import Sample
+from pynapse.core.sample import Sample
 
 
 class Population:
@@ -67,7 +67,7 @@ class Population:
         return f"{name}\n{desc}\n{samples}"
 
 if __name__ == "__main__":
-    from brew.config.events import LEGACY_HER
+    from pynapse.config.events import LEGACY_HER
 
     s1 = Sample(
         name="Sample 1",

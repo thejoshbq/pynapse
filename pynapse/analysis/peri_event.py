@@ -15,12 +15,13 @@ Classes:
 
 import numpy as np
 from numpy.typing import NDArray
-from typing import List
-from brew.core.sample import Sample
-from brew.core.population import Population
+from typing import List, Optional
+from pynapse.core.sample import Sample
+from pynapse.core.population import Population
+from pynapse.analysis.preprocessing.base import Preprocessor
 
 
-class EventMatrix:
+class EventTensor:
     def __init__(
         self,
         data: Sample | Population,
@@ -29,14 +30,18 @@ class EventMatrix:
         post_event: float,
         buffer_ms: int = 0,
         min_trials: int = 1,
+        pre_window_preprocessor: Optional[Preprocessor] = None,
+        post_window_preprocessor: Optional[Preprocessor] = None,
     ):
+        self._data = data
         self._event_id = event_id
         self._pre_event = pre_event
         self._post_event = post_event
         self._buffer_ms = buffer_ms
         self._min_trials = min_trials
-        self._data = data
-        self._matrix = None
+        self._pre_window_preprocessor = pre_window_preprocessor
+        self._post_window_preprocessor = post_window_preprocessor
+        self._tensor = None
 
     @staticmethod
     def _sec_to_frames(s: float, fps: float) -> int:
@@ -50,7 +55,7 @@ class EventMatrix:
         valid_mask = np.append(diffs > buffer_frames, True)
         return indices[valid_mask]
 
-class SampleEventTensor(EventMatrix):
+class SampleEventTensor(EventTensor):
     def __init__(
             self,
             sample: Sample,
@@ -59,14 +64,28 @@ class SampleEventTensor(EventMatrix):
             post_event: float,
             buffer_ms: int = 0,
             min_trials: int = 1,
+            pre_window_preprocessor: Optional[Preprocessor] = None,
+            post_window_preprocessor: Optional[Preprocessor] = None,
     ):
         self._data = sample
-        super().__init__(sample, event_id, pre_event, post_event, buffer_ms, min_trials)
-        self._tensor = self._extract_event_windows()
+        self._pre_window_preprocessor = pre_window_preprocessor
+        self._post_window_preprocessor = post_window_preprocessor
+        super().__init__(
+            sample,
+            event_id,
+            pre_event,
+            post_event,
+            buffer_ms,
+            min_trials,
+            pre_window_preprocessor,
+            post_window_preprocessor
+        )
 
     def _extract_event_windows(self) -> NDArray:
         df = self._data.get_dataframe()
         signals = self._data.get_signals()  # neurons x frames
+        if self._pre_window_preprocessor is not None:
+            signals = self._pre_window_preprocessor(signals)
         fps = self._data.effective_fps
         event_indices = df["frame_index"][df["code"] == self._event_id].values
         event_indices = self._filter_event_indices(event_indices)
@@ -78,6 +97,8 @@ class SampleEventTensor(EventMatrix):
             if 0 <= start and end <= signals.shape[1]:
                 win = signals[:, start:end]
                 windows.append(win)
+        if self._post_window_preprocessor is not None:
+            windows = self._post_window_preprocessor(windows)
         return np.stack(windows)
 
     def get_event_windows(self) -> NDArray:
@@ -85,7 +106,7 @@ class SampleEventTensor(EventMatrix):
             self._tensor = self._extract_event_windows()
         return self._tensor
 
-class PopulationEventTensor(EventMatrix): # FIXME: incomplete
+class PopulationEventTensor(EventTensor):
     def __init__(
             self,
             population: Population,
@@ -94,14 +115,19 @@ class PopulationEventTensor(EventMatrix): # FIXME: incomplete
             post_event: float,
             buffer_ms: int = 0,
             min_trials: int = 1,
+            pre_window_preprocessor: Optional[Preprocessor] = None,
+            post_window_preprocessor: Optional[Preprocessor] = None,
     ):
-        self._data = population
-        self._event_id = event_id
-        self._pre_event = pre_event
-        self._post_event = post_event
-        self._buffer_ms = buffer_ms
-        self._min_trials = min_trials
-        super().__init__(population, event_id, pre_event, post_event, buffer_ms, min_trials)
+        super().__init__(
+            population,
+            event_id,
+            pre_event,
+            post_event,
+            buffer_ms,
+            min_trials,
+            pre_window_preprocessor,
+            post_window_preprocessor
+        )
         self._tensor = self._extract_event_windows()
 
     def _extract_event_windows(self) -> List[NDArray]:
@@ -109,7 +135,16 @@ class PopulationEventTensor(EventMatrix): # FIXME: incomplete
         for sample in self._data.get_samples():
             if sample.get_num_events(self._event_id) < self._min_trials:
                 continue
-            sample_tensor = SampleEventTensor(sample, self._event_id, self._pre_event, self._post_event, self._buffer_ms, self._min_trials)
+            sample_tensor = SampleEventTensor(
+                sample,
+                self._event_id,
+                self._pre_event,
+                self._post_event,
+                self._buffer_ms,
+                self._min_trials,
+                self._pre_window_preprocessor,
+                self._post_window_preprocessor,
+            )
             event_windows.append(sample_tensor.get_event_windows())
         return event_windows
 

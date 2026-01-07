@@ -15,14 +15,13 @@ Classes:
 """
 
 from abc import ABC, abstractmethod
-from brew.core.sample import Sample
 import numpy as np
 from numpy.typing import NDArray
 
 
 class Preprocessor(ABC):
     @abstractmethod
-    def apply(self, sample: Sample) -> NDArray[np.float32]:
+    def apply(self, data: NDArray[np.floating]) -> NDArray[np.float32]:
         pass
 
     def __repr__(self) -> str:

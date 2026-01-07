@@ -24,8 +24,8 @@ import pandas as pd
 import scipy.io as sio
 from typing import Dict, List, Optional, Union
 from pathlib import Path
-from brew.core.io.behavior import EventLog
-from brew.core.io.microscopy import SignalRecording
+from pynapse.core.io.behavior import EventLog
+from pynapse.core.io.microscopy import SignalRecording
 
 
 class Sample:
@@ -195,8 +195,8 @@ class Sample:
     def get_signals(self):
         return self._signals.get_signals()
 
-    def get_event_log(self):
-        return self._event_log.get_raw_data()
+    def get_event_log(self) -> EventLog:
+        return self._event_log
 
     def get_num_events(self, event_id: int) -> int:
         return self._event_log.count_events(event_id)
@@ -227,7 +227,7 @@ class Sample:
         return f"{name}\n{event_source}\n{signal_source}\n{fps}\n{averaging}\n{n_neurons}\n{n_frames}\n{n_events}"
 
 if __name__ == "__main__":
-    from brew.config.events import LEGACY_HER
+    from pynapse.config.events import LEGACY_HER
 
     sample = Sample(
         event_data=[r"../../data/0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat",

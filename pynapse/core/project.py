@@ -12,8 +12,8 @@ of project information.
 """
 
 from typing import List
-from brew.core.population import Population
-from brew.core.sample import Sample
+from pynapse.core.population import Population
+from pynapse.core.sample import Sample
 
 
 class Project:

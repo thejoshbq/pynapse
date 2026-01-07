@@ -2,20 +2,17 @@
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
 
-from brew.analysis.peri_event import *
 import os
-from brew.config.events import LEGACY_HER
-from brew.config.pipelines import *
+from pynapse.config.events import LEGACY_HER
+from pynapse.analysis.preprocessing.epoch.pipelines import *
+from pynapse.analysis.preprocessing.continuous.normalization import *
 import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
-from scipy import stats
-
-from brew.core import Population
-from brew.analysis.peri_event import *
+from pynapse.analysis.peri_event import *
 
 
 def test_analysis(basedir: str):
+    import pathlib
+    correction_path = str(pathlib.Path(__file__).parent.parent.parent / "data" / "empty.mat")
     sample_names = [s for s in os.listdir(basedir) if os.path.isdir(os.path.join(basedir, s))]
     samples = []
     for s in sample_names:
@@ -33,7 +30,7 @@ def test_analysis(basedir: str):
                     fps=30,
                     frame_averaging=4,
                     frame_correction=True,
-                    correction_file=r"./../../data/empty.mat",
+                    correction_file=correction_path,
                     event_dict=LEGACY_HER
                 )
                 samples.append(sample)
@@ -41,16 +38,27 @@ def test_analysis(basedir: str):
                 print(f"Sample {s} failed ({e}); skipping")
                 continue
     population = Population(name=basedir, samples=samples)
-    population_tensor = PopulationEventTensor(population, 22, 10, 11.6, min_trials=3, buffer_ms=1000)
+    frame_duration_ms = 1000 / population.get_samples()[0].effective_fps
+    population_tensor = PopulationEventTensor(
+        population,
+        event_id=22,
+        pre_event=10,
+        post_event=11.6,
+        min_trials=3,
+        buffer_ms=1000,
+        pre_window_preprocessor=LegacyNormalize(),
+        post_window_preprocessor=BaselineSubtraction(method='mean', window_ms=(0, 3000), frame_duration_ms=frame_duration_ms),
+    )
     event_windows = population_tensor.get_event_windows()
     return event_windows
 
 
 if __name__ == "__main__":
-    basedir = r"./../../data/"
+    import pathlib
+    basedir = str(pathlib.Path(__file__).parent.parent.parent / "data")
     mean_windows = {}
     pipe = OTIS_PIPE
-    for population in os.listdir(basedir):
+    for population in sorted(os.listdir(basedir)):
         mean_windows[population] = {}
         if os.path.isdir(os.path.join(basedir, population)):
             processed_population_mean_windows = []
