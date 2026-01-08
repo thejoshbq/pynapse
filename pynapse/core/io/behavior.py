@@ -16,10 +16,8 @@ Classes:
 import os
 from pathlib import Path
 from typing_extensions import deprecated
-
 import scipy.io as sio
 import warnings
-from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
@@ -126,7 +124,7 @@ class EventLog:
     def get_raw_data(self) -> NDArray[Any]:
         return self._raw_data
 
-    def count_events(self, target: int | str = None) -> int:
+    def count_events(self, target: int | List[int] | str = None) -> int:
         if target is None:
             return len(self._event_log)
         else:
@@ -134,6 +132,8 @@ class EventLog:
                 return self._event_log.loc[self._event_log["label"] == target, "code"].count()
             elif isinstance(target, int):
                 return self._event_log.loc[self._event_log["code"] == target, "code"].count()
+            elif isinstance(target, list):
+                return self._event_log.loc[self._event_log["code"].isin(target), "code"].count()
 
     def __str__(self):
         name = f"Name: {self.name}"

@@ -25,7 +25,7 @@ class EventTensor:
     def __init__(
         self,
         data: Sample | Population,
-        event_id: int,
+        event_id: int | List[int],
         pre_event: float,
         post_event: float,
         buffer_ms: int = 0,
@@ -34,7 +34,7 @@ class EventTensor:
         post_window_preprocessor: Optional[Preprocessor] = None,
     ):
         self._data = data
-        self._event_id = event_id
+        self._event_id = event_id if isinstance(event_id, list) else [event_id]
         self._pre_event = pre_event
         self._post_event = post_event
         self._buffer_ms = buffer_ms
@@ -50,7 +50,7 @@ class EventTensor:
     def _filter_event_indices(self, indices: NDArray) -> NDArray:
         if self._buffer_ms <= 0:
             return indices
-        buffer_frames = self._buffer_ms / self._data.interframe_interval  # Assumes _data set in subclass
+        buffer_frames = self._buffer_ms / self._data.interframe_interval
         diffs = np.diff(indices)
         valid_mask = np.append(diffs > buffer_frames, True)
         return indices[valid_mask]
@@ -59,7 +59,7 @@ class SampleEventTensor(EventTensor):
     def __init__(
             self,
             sample: Sample,
-            event_id: int,
+            event_id: int | List[int],
             pre_event: float,
             post_event: float,
             buffer_ms: int = 0,
@@ -81,25 +81,47 @@ class SampleEventTensor(EventTensor):
             post_window_preprocessor
         )
 
-    def _extract_event_windows(self) -> NDArray:
+    def _extract_event_windows(self) -> NDArray[np.floating]:
         df = self._data.get_dataframe()
-        signals = self._data.get_signals()  # neurons x frames
+        signals = self._data.get_signals()
         if self._pre_window_preprocessor is not None:
-            signals = self._pre_window_preprocessor(signals)
-        fps = self._data.effective_fps
-        event_indices = df["frame_index"][df["code"] == self._event_id].values
-        event_indices = self._filter_event_indices(event_indices)
+            signals = self._pre_window_preprocessor.apply(signals)
+        fps_eff = self._data.effective_fps
+        event_ts_ms = []
+        for eid in self._event_id:
+            event_ts_ms.extend(df[df["code"] == eid]["t1"].values)
+        event_ts_ms = np.sort(np.array(event_ts_ms, dtype=np.float64))
+        if self._buffer_ms > 0:
+            diffs_ms = np.diff(event_ts_ms)
+            close_later_idx = np.where(diffs_ms < self._buffer_ms)[0] + 1
+            event_ts_ms = np.delete(event_ts_ms, close_later_idx)
+        if len(event_ts_ms) < self._min_trials:
+            return np.empty((0, self._data.num_neurons, 0))
+        frame_ts = self._data._get_frame_timestamps() # FIXME: access private method
+        indices = np.searchsorted(frame_ts, event_ts_ms, side="right") - 1
+        valid = frame_ts[indices] <= event_ts_ms
+        indices[~valid] = 0
+        pre_frames = self._sec_to_frames(self._pre_event, fps_eff)
+        post_frames = self._sec_to_frames(self._post_event, fps_eff)
+        window_size = pre_frames + post_frames
         windows = []
-        pre = self._sec_to_frames(self._pre_event, fps)
-        post = self._sec_to_frames(self._post_event, fps)
-        for idx in event_indices:
-            start, end = idx - pre, idx + post
-            if 0 <= start and end <= signals.shape[1]:
-                win = signals[:, start:end]
-                windows.append(win)
+        for idx in indices:
+            if idx == 0:
+                continue
+            start = idx - pre_frames
+            end = idx + post_frames
+            if start < 0 or end > signals.shape[1]:
+                continue
+            win = signals[:, start:end]
+            windows.append(win)
+        if not windows:
+            return np.empty((0, self._data.num_neurons, window_size))
+        stacked = np.stack(windows, axis=0)
+
         if self._post_window_preprocessor is not None:
-            windows = self._post_window_preprocessor(windows)
-        return np.stack(windows)
+            stacked = self._post_window_preprocessor.apply(stacked)
+
+        return stacked
 
     def get_event_windows(self) -> NDArray:
         if self._tensor is None:
@@ -110,7 +132,7 @@ class PopulationEventTensor(EventTensor):
     def __init__(
             self,
             population: Population,
-            event_id: int,
+            event_id: int | List[int],
             pre_event: float,
             post_event: float,
             buffer_ms: int = 0,
@@ -133,7 +155,8 @@ class PopulationEventTensor(EventTensor):
     def _extract_event_windows(self) -> List[NDArray]:
         event_windows = []
         for sample in self._data.get_samples():
-            if sample.get_num_events(self._event_id) < self._min_trials:
+            total_events = sum(sample.get_num_events(eid) for eid in self._event_id)
+            if total_events < self._min_trials:
                 continue
             sample_tensor = SampleEventTensor(
                 sample,

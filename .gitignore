@@ -1,5 +1,4 @@
-./data
-./venv
-__pycache__/
-./WARP.md
-
+data/
+.venv/
+*./__pycache__/
+.idea/

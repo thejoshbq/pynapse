@@ -25,12 +25,10 @@ class LegacyNormalize(Preprocessor):
         if signals.ndim != 2:
             raise ValueError(f"LegacyNormalize expects 2D array (neurons x frames), got {signals.ndim}D")
         
-        # Step 1: Normalize by mean
         means = np.nanmean(signals, axis=1, keepdims=True)
         means_safe = np.where(means == 0, np.nan, means)
         signals_norm = signals / means_safe
         
-        # Step 2: Z-score full trace (if enabled)
         if self.z_score:
             for neuron in range(signals_norm.shape[0]):
                 mean = np.nanmean(signals_norm[neuron])

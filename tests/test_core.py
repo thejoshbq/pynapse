@@ -2,10 +2,10 @@
 # Joshua Boquiren (@thejoshbq)
 # boquiren@musc.edu
 
-from brew.core.project import *
-from brew.analysis.peri_event import *
+from pynapse.core.project import *
+from pynapse.analysis.peri_event import *
 import os
-from brew.config.events import LEGACY_HER
+from pynapse.config.events import LEGACY_HER
 
 def test_core(basedir: str):
     population_names = [p for p in os.listdir(basedir) if os.path.isdir(os.path.join(basedir, p))]
@@ -29,7 +29,7 @@ def test_core(basedir: str):
                         fps=30,
                         frame_averaging=4,
                         frame_correction=True,
-                        correction_file=r"../../data/empty.mat",
+                        correction_file=r"../data/empty.mat",
                         event_dict=LEGACY_HER
                     )
                     samples.append(sample)
