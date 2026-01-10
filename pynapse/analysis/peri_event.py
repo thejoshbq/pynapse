@@ -19,6 +19,7 @@ from typing import List, Optional
 from pynapse.core.sample import Sample
 from pynapse.core.population import Population
 from pynapse.analysis.preprocessing.base import Preprocessor
+from pynapse.analysis.preprocessing.pipeline import Pipeline
 
 
 class EventTensor:
@@ -30,8 +31,8 @@ class EventTensor:
         post_event: float,
         buffer_ms: int = 0,
         min_trials: int = 1,
-        pre_window_preprocessor: Optional[Preprocessor] = None,
-        post_window_preprocessor: Optional[Preprocessor] = None,
+        trace_preprocess: Optional[Preprocessor] | Pipeline = None,
+        window_preprocess: Optional[Preprocessor] | Pipeline = None,
     ):
         self._data = data
         self._event_id = event_id if isinstance(event_id, list) else [event_id]
@@ -39,8 +40,8 @@ class EventTensor:
         self._post_event = post_event
         self._buffer_ms = buffer_ms
         self._min_trials = min_trials
-        self._pre_window_preprocessor = pre_window_preprocessor
-        self._post_window_preprocessor = post_window_preprocessor
+        self._trace_preprocess = trace_preprocess
+        self._window_preprocess = window_preprocess
         self._tensor = None
 
     @staticmethod
@@ -64,12 +65,12 @@ class SampleEventTensor(EventTensor):
             post_event: float,
             buffer_ms: int = 0,
             min_trials: int = 1,
-            pre_window_preprocessor: Optional[Preprocessor] = None,
-            post_window_preprocessor: Optional[Preprocessor] = None,
+            trace_preprocess: Optional[Preprocessor] | Pipeline = None,
+            window_preprocess: Optional[Preprocessor] | Pipeline = None,
     ):
         self._data = sample
-        self._pre_window_preprocessor = pre_window_preprocessor
-        self._post_window_preprocessor = post_window_preprocessor
+        self._trace_preprocess = trace_preprocess
+        self._window_preprocess = window_preprocess
         super().__init__(
             sample,
             event_id,
@@ -77,15 +78,15 @@ class SampleEventTensor(EventTensor):
             post_event,
             buffer_ms,
             min_trials,
-            pre_window_preprocessor,
-            post_window_preprocessor
+            trace_preprocess,
+            window_preprocess
         )
 
     def _extract_event_windows(self) -> NDArray[np.floating]:
         df = self._data.get_dataframe()
         signals = self._data.get_signals()
-        if self._pre_window_preprocessor is not None:
-            signals = self._pre_window_preprocessor.apply(signals)
+        if self._trace_preprocess is not None:
+            signals = self._trace_preprocess.apply(signals)
         fps_eff = self._data.effective_fps
         event_ts_ms = []
         for eid in self._event_id:
@@ -118,8 +119,8 @@ class SampleEventTensor(EventTensor):
             return np.empty((0, self._data.num_neurons, window_size))
         stacked = np.stack(windows, axis=0)
 
-        if self._post_window_preprocessor is not None:
-            stacked = self._post_window_preprocessor.apply(stacked)
+        if self._window_preprocess is not None:
+            stacked = self._window_preprocess.apply(stacked)
 
         return stacked
 
@@ -137,8 +138,8 @@ class PopulationEventTensor(EventTensor):
             post_event: float,
             buffer_ms: int = 0,
             min_trials: int = 1,
-            pre_window_preprocessor: Optional[Preprocessor] = None,
-            post_window_preprocessor: Optional[Preprocessor] = None,
+            trace_preprocess: Optional[Preprocessor] | Pipeline = None,
+            window_preprocess: Optional[Preprocessor] | Pipeline = None,
     ):
         super().__init__(
             population,
@@ -147,8 +148,8 @@ class PopulationEventTensor(EventTensor):
             post_event,
             buffer_ms,
             min_trials,
-            pre_window_preprocessor,
-            post_window_preprocessor
+            trace_preprocess,
+            window_preprocess
         )
         self._tensor = self._extract_event_windows()
 
@@ -165,8 +166,8 @@ class PopulationEventTensor(EventTensor):
                 self._post_event,
                 self._buffer_ms,
                 self._min_trials,
-                self._pre_window_preprocessor,
-                self._post_window_preprocessor,
+                self._trace_preprocess,
+                self._window_preprocess,
             )
             event_windows.append(sample_tensor.get_event_windows())
         return event_windows

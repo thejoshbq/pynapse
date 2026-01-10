@@ -17,7 +17,7 @@ from pynapse.analysis.preprocessing.base import Preprocessor
 class BaselineSubtraction(Preprocessor):
     def __init__(
         self,
-        method: Literal["mean", "median"] = "median",
+        method: Literal["mean", "median"] = "mean",
         window_ms: Optional[Tuple[float, float]] = None,
         frame_duration_ms: Optional[float] = None,
     ) -> None:

@@ -11,5 +11,14 @@ papers, and the local database. Import these instead of constructing pipelines m
 
 from __future__ import annotations
 from pynapse.analysis.preprocessing.continuous import (
-    LegacyNormalize,
+    Pipeline,
+    Normalize,
+    BaselineSubtraction
+)
+
+
+LEGACY_PIPE = Pipeline(
+    steps=[
+        BaselineSubtraction(method="mean", window_ms=(-3000, -500), frame_duration_ms=33.333),
+    ]
 )

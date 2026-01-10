@@ -14,12 +14,11 @@ from pynapse.analysis.preprocessing.epoch import (
     DFOverF,
     ZScore,
     GaussianSmoothing,
-    BaselineSubtraction,
-    ProcessingPipeline,
+    Pipeline,
 )
 
 
-OTIS_PIPE = ProcessingPipeline(
+OTIS_PIPE = Pipeline(
     steps=[
         DFOverF(percentile=8),
         ZScore(window_ms=(-3000.0, -500.0)),

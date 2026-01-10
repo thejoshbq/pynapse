@@ -196,7 +196,7 @@ print("="*80)
 
 from pynapse.config.events import LEGACY_HER
 from pynapse.core.sample import Sample
-from pynapse.analysis.preprocessing.continuous.normalization import LegacyNormalize
+from pynapse.analysis.preprocessing.continuous.normalization import Normalize
 from pynapse.analysis.peri_event import SampleEventTensor
 
 mat_files = [os.path.join(indir, matfile)]
@@ -229,7 +229,7 @@ print(f"\nSignals (New):")
 print(f"  Raw signals shape: {signals_new_raw.shape}")
 
 # Apply preprocessing
-preprocessor = LegacyNormalize(z_score=True)
+preprocessor = Normalize(z_score=True)
 signals_new_preprocessed = preprocessor.apply(signals_new_raw)
 print(f"\nNormalization (New):")
 print(f"  After LegacyNormalize: shape={signals_new_preprocessed.shape}")
@@ -261,8 +261,8 @@ tensor = SampleEventTensor(
     post_event=11.6,
     buffer_ms=1000,
     min_trials=3,
-    pre_window_preprocessor=LegacyNormalize(),
-    post_window_preprocessor=None,
+    trace_preprocess=Normalize(),
+    window_preprocess=None,
 )
 
 event_windows_new = tensor.get_event_windows()

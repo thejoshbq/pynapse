@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 from pynapse.analysis.preprocessing.base import Preprocessor
 
 
-class LegacyNormalize(Preprocessor):
+class Normalize(Preprocessor):
     def __init__(self, z_score: bool = True):
         self.z_score = z_score
     
@@ -21,14 +21,11 @@ class LegacyNormalize(Preprocessor):
     
     def apply(self, signals: NDArray[np.floating]) -> NDArray[np.float32]:
         signals = np.asarray(signals, dtype=np.float64)
-        
         if signals.ndim != 2:
-            raise ValueError(f"LegacyNormalize expects 2D array (neurons x frames), got {signals.ndim}D")
-        
+            raise ValueError(f"Expects 2D array (neurons x frames), got {signals.ndim}D")
         means = np.nanmean(signals, axis=1, keepdims=True)
         means_safe = np.where(means == 0, np.nan, means)
         signals_norm = signals / means_safe
-        
         if self.z_score:
             for neuron in range(signals_norm.shape[0]):
                 mean = np.nanmean(signals_norm[neuron])
