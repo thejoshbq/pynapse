@@ -2,3 +2,9 @@ data/
 .venv/
 *./__pycache__/
 .idea/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
