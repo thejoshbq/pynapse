@@ -38,6 +38,7 @@ class EventTensor:
         self._event_id = event_id if isinstance(event_id, list) else [event_id]
         self._pre_event = pre_event
         self._post_event = post_event
+        self._event_frame = self._sec_to_frames(self._pre_event, self._data.effective_fps)
         self._buffer_ms = buffer_ms
         self._min_trials = min_trials
         self._trace_preprocess = trace_preprocess
@@ -129,7 +130,7 @@ class SampleEventTensor(EventTensor):
             self._tensor = self._extract_event_windows()
         return self._tensor
 
-class PopulationEventTensor(EventTensor):
+class PopulationEventTensor:
     def __init__(
             self,
             population: Population,
@@ -141,16 +142,17 @@ class PopulationEventTensor(EventTensor):
             trace_preprocess: Optional[Preprocessor] | Pipeline = None,
             window_preprocess: Optional[Preprocessor] | Pipeline = None,
     ):
-        super().__init__(
-            population,
-            event_id,
-            pre_event,
-            post_event,
-            buffer_ms,
-            min_trials,
-            trace_preprocess,
-            window_preprocess
-        )
+        self._data = population
+        self._event_id = event_id if isinstance(event_id, list) else [event_id]
+        self._pre_event = pre_event
+        self._post_event = post_event
+        self._buffer_ms = buffer_ms
+        self._min_trials = min_trials
+        self._trace_preprocess = trace_preprocess
+        self._window_preprocess = window_preprocess
+        # Use first sample's effective_fps for event frame calculation
+        first_sample = population.get_samples()[0]
+        self._event_frame = int(pre_event * first_sample.effective_fps)
         self._tensor = self._extract_event_windows()
 
     def _extract_event_windows(self) -> List[NDArray]:
@@ -172,7 +174,126 @@ class PopulationEventTensor(EventTensor):
             event_windows.append(sample_tensor.get_event_windows())
         return event_windows
 
+    @property
+    def num_neurons(self) -> int:
+        return self._data.num_neurons
+
+    @property
+    def num_samples(self) -> int:
+        return self._data.num_samples
+
     def get_event_windows(self) -> List[NDArray]:
         if self._tensor is None:
             self._tensor = self._extract_event_windows()
         return self._tensor
+
+    def get_grand_average(self) -> NDArray:
+        trial_averages = []
+        for tensor in self._tensor:
+            if tensor.size > 0:
+                trial_averages.append(np.nanmean(tensor, axis=0))
+        if not trial_averages:
+            return np.array([])
+        trial_average = np.vstack(trial_averages)
+        return np.nanmean(trial_average, axis=0)
+
+    def get_trial_average(
+        self, epoch: str = "full_trace", method: str = "unsorted"
+    ) -> NDArray:
+        trial_averages = []
+        for tensor in self._tensor:
+            if tensor.size > 0:
+                trial_averages.append(np.nanmean(tensor, axis=0))
+        if not trial_averages:
+            return np.array([])
+        trial_average = np.vstack(trial_averages)
+        if epoch == "post_event":
+            sort_slice = slice(self._event_frame, None)
+        elif epoch == "pre_event":
+            sort_slice = slice(None, self._event_frame)
+        elif epoch == "full_trace":
+            sort_slice = slice(None, None)
+        else:
+            raise ValueError(f"Invalid epoch: {epoch}")
+        if method == "excitatory":
+            sort_idx = np.argsort(np.argmax(trial_average[:, sort_slice], axis=1))
+        elif method == "inhibitory":
+            sort_idx = np.argsort(np.argmin(trial_average[:, sort_slice], axis=1))
+        elif method == "unsorted":
+            sort_idx = np.arange(len(trial_average))
+        else:
+            raise ValueError(f"Invalid sort method: {method}")
+        return trial_average[sort_idx]
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+    from pynapse.core.sample import Sample
+    from pynapse.core.population import Population
+    from pynapse.config.events import LEGACY_HER
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    DATA_DIR = PROJECT_ROOT / "data"
+
+    s1 = Sample(
+        name="CTL1-FOV1",
+        event_data=[
+            str(DATA_DIR / "0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat"),
+            str(DATA_DIR / "0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"),
+        ],
+        signal_data=[
+            str(DATA_DIR / "0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy"),
+            str(DATA_DIR / "0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"),
+        ],
+        event_dict=LEGACY_HER,
+        fps=30,
+        frame_averaging=4,
+        frame_correction=True,
+        correction_file=str(DATA_DIR / "empty.mat"),
+    )
+
+    s2 = Sample(
+        name="ER-L1-FOV1",
+        event_data=str(DATA_DIR / "0 EarlyAcq/ER-L1/FOV1/ER-L1_HER-2P_HI_D1_PrL-FOV1_0_6000_191105-180825.mat"),
+        signal_data=str(DATA_DIR / "0 EarlyAcq/ER-L1/FOV1/T2_ER-L1_HER-2P_HI-D1_PrL-FOV1_behavior-001_extractedsignals_raw.npy"),
+        event_dict=LEGACY_HER,
+        fps=30,
+        frame_averaging=4,
+        frame_correction=True,
+        correction_file=str(DATA_DIR / "empty.mat"),
+    )
+
+    population = Population(name="EarlyAcq Test", samples=[s1, s2])
+    print(f"Population: {population.name}")
+    print(f"  Samples: {population.num_samples}")
+    print(f"  Neurons: {population.num_neurons}")
+
+    tensor = PopulationEventTensor(
+        population=population,
+        event_id=[22,222],
+        pre_event=2.0,
+        post_event=5.0,
+        buffer_ms=500,
+        min_trials=3,
+    )
+
+    windows = tensor.get_event_windows()
+    print(f"\nEvent windows (list of {len(windows)} sample tensors):")
+    for i, w in enumerate(windows):
+        print(f"  Sample {i}: shape {w.shape} (trials, neurons, frames)")
+
+    print("\nTesting get_trial_average():")
+
+    avg_unsorted = tensor.get_trial_average(epoch="full_trace", method="unsorted")
+    print(f"  Unsorted (full_trace): shape {avg_unsorted.shape}")
+
+    avg_excitatory = tensor.get_trial_average(epoch="post_event", method="excitatory")
+    print(f"  Excitatory (post_event): shape {avg_excitatory.shape}")
+
+    avg_inhibitory = tensor.get_trial_average(epoch="pre_event", method="inhibitory")
+    print(f"  Inhibitory (pre_event): shape {avg_inhibitory.shape}")
+
+    import matplotlib.pyplot as plt
+    ga = tensor.get_grand_average()
+    plt.plot(ga)
+    plt.show()
