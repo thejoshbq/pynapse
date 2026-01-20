@@ -18,7 +18,6 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings('always', category=UserWarning)
 warnings.filterwarnings('always', category=DeprecationWarning)
-from tqdm import tqdm
 import numpy as np
 from numpy.typing import NDArray
 from typing import Any, List, Union

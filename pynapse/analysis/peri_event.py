@@ -16,10 +16,8 @@ Classes:
 import numpy as np
 from numpy.typing import NDArray
 from typing import List, Optional
-from pynapse.core.sample import Sample
-from pynapse.core.population import Population
-from pynapse.analysis.preprocessing.base import Preprocessor
-from pynapse.analysis.preprocessing.pipeline import Pipeline
+from pynapse.core import Sample, Population
+from pynapse.analysis.preprocessing import Preprocessor, Pipeline
 
 
 class EventTensor:
@@ -227,76 +225,3 @@ class PopulationEventTensor:
         else:
             raise ValueError(f"Invalid sort method: {method}")
         return trial_average[sort_idx]
-
-
-# if __name__ == "__main__":
-#     from pathlib import Path
-#     from pynapse.core.sample import Sample
-#     from pynapse.core.population import Population
-#     from pynapse.config.events import LEGACY_HER
-
-#     PROJECT_ROOT = Path(__file__).resolve().parents[2]
-#     DATA_DIR = PROJECT_ROOT / "data"
-
-#     s1 = Sample(
-#         name="CTL1-FOV1",
-#         event_data=[
-#             str(DATA_DIR / "0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-144741_part1.mat"),
-#             str(DATA_DIR / "0 EarlyAcq/CTL1/FOV1/HH-CTL1_HER_HI_D1_0_6000_191028-163758_part2.mat"),
-#         ],
-#         signal_data=[
-#             str(DATA_DIR / "0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-001_extractedsignals_raw_part1.npy"),
-#             str(DATA_DIR / "0 EarlyAcq/CTL1/FOV1/T2_HH-CTL1_HER_HI_D1_behavior-000_extractedsignals_raw_part2.npy"),
-#         ],
-#         event_dict=LEGACY_HER,
-#         fps=30,
-#         frame_averaging=4,
-#         frame_correction=True,
-#         correction_file=str(DATA_DIR / "empty.mat"),
-#     )
-
-#     s2 = Sample(
-#         name="ER-L1-FOV1",
-#         event_data=str(DATA_DIR / "0 EarlyAcq/ER-L1/FOV1/ER-L1_HER-2P_HI_D1_PrL-FOV1_0_6000_191105-180825.mat"),
-#         signal_data=str(DATA_DIR / "0 EarlyAcq/ER-L1/FOV1/T2_ER-L1_HER-2P_HI-D1_PrL-FOV1_behavior-001_extractedsignals_raw.npy"),
-#         event_dict=LEGACY_HER,
-#         fps=30,
-#         frame_averaging=4,
-#         frame_correction=True,
-#         correction_file=str(DATA_DIR / "empty.mat"),
-#     )
-
-#     population = Population(name="EarlyAcq Test", samples=[s1, s2])
-#     print(f"Population: {population.name}")
-#     print(f"  Samples: {population.num_samples}")
-#     print(f"  Neurons: {population.num_neurons}")
-
-#     tensor = PopulationEventTensor(
-#         population=population,
-#         event_id=[22,222],
-#         pre_event=2.0,
-#         post_event=5.0,
-#         buffer_ms=500,
-#         min_trials=3,
-#     )
-
-#     windows = tensor.get_event_windows()
-#     print(f"\nEvent windows (list of {len(windows)} sample tensors):")
-#     for i, w in enumerate(windows):
-#         print(f"  Sample {i}: shape {w.shape} (trials, neurons, frames)")
-
-#     print("\nTesting get_trial_average():")
-
-#     avg_unsorted = tensor.get_trial_average(epoch="full_trace", method="unsorted")
-#     print(f"  Unsorted (full_trace): shape {avg_unsorted.shape}")
-
-#     avg_excitatory = tensor.get_trial_average(epoch="post_event", method="excitatory")
-#     print(f"  Excitatory (post_event): shape {avg_excitatory.shape}")
-
-#     avg_inhibitory = tensor.get_trial_average(epoch="pre_event", method="inhibitory")
-#     print(f"  Inhibitory (pre_event): shape {avg_inhibitory.shape}")
-
-#     import matplotlib.pyplot as plt
-#     ga = tensor.get_grand_average()
-#     plt.plot(ga)
-#     plt.show()

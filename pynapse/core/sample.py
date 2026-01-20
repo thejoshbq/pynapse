@@ -24,8 +24,7 @@ import pandas as pd
 import scipy.io as sio
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
-from pynapse.core.io.behavior import EventLog
-from pynapse.core.io.microscopy import SignalRecording
+from pynapse.core import EventLog, SignalRecording
 from pynapse.core.mixins import TensorConfigMixin
 
 

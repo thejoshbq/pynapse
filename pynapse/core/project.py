@@ -12,8 +12,7 @@ of project information.
 """
 
 from typing import List
-from pynapse.core.population import Population
-from pynapse.core.sample import Sample
+from pynapse.core import Sample, Population
 
 
 class Project:

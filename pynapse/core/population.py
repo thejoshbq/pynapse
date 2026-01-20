@@ -15,7 +15,7 @@ Classes:
 """
 
 from typing import Any, List, Optional, Union
-from pynapse.core.sample import Sample
+from pynapse.core import Sample
 from pynapse.core.mixins import TensorConfigMixin
 
 
