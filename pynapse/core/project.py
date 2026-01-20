@@ -49,11 +49,12 @@ class Project:
 
     def __str__(self):
         name = f"Name: {self.name}"
+        authors = f"Authors: {', '.join(self._authors)}"
         desc = f"Description: {self.description}"
         populations = "Populations:"
         for population in self._populations:
             populations += f"\n - {population.name}, n={population.num_samples} ({population.num_neurons} neurons)"
-        return f"{name}\n{desc}\n{populations}"
+        return f"{name}\n{authors}\n{desc}\n{populations}"
 
 if __name__ == "__main__":
     event_dict = {
