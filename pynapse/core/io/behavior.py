@@ -35,13 +35,14 @@ class EventLog:
         self._source = source
         self._event_log = None
         self._event_dict = event_dict
-        if isinstance(source, str) or isinstance(source, Path):
-            if os.path.isfile(source):
-                if source.endswith(".mat"):
+        source_str = str(source) if isinstance(source, (str, Path)) else None
+        if source_str is not None:
+            if os.path.isfile(source_str):
+                if source_str.endswith(".mat"):
                     warnings.warn("Use of MATLAB-produced event logs for the 'event_log' parameter is deprecated and will be removed in a future version.", DeprecationWarning)
-                    self._raw_data = self._load_mat_file(source)
-                elif source.endswith(".csv"):
-                    pass # FIXME: CSV reader to be implemented in future version
+                    self._raw_data = self._load_mat_file(source_str)
+                elif source_str.endswith(".csv"):
+                    self._raw_data = self._load_reacher_csv(source_str)
                 else:
                     raise ValueError("Unsupported file format.")
             else:
@@ -94,6 +95,63 @@ class EventLog:
             else:
                 stack = np.empty((0, 2))
         return stack
+
+    def _load_reacher_csv(self, path: Union[str, Path]) -> NDArray[Any]:
+        """Load a REACHER-produced behavior_events.csv file.
+
+        Reads the CSV exported by the REACHER system, maps each device+event
+        string pair to an integer code using the standard REACHER event
+        dictionary, and returns a raw data array in the same format as legacy
+        MATLAB data: ``[[code, start_timestamp, end_timestamp], ...]``.
+
+        Unknown device+event combinations are auto-assigned codes starting at
+        900 and emit a UserWarning.
+
+        If ``event_dict`` was not provided to the constructor, it is auto-set
+        to the standard REACHER mapping (including any auto-assigned codes).
+        """
+        from pynapse.config.events import REACHER, _REACHER_LABEL_TO_CODE
+
+        df = pd.read_csv(path)
+        expected_cols = {"device", "event", "start_timestamp", "end_timestamp"}
+        if not expected_cols.issubset(df.columns):
+            raise ValueError(
+                f"REACHER CSV missing required columns. Expected {expected_cols}, "
+                f"got {set(df.columns)}"
+            )
+
+        if df.empty:
+            if self._event_dict is None:
+                self._event_dict = dict(REACHER)
+            return np.empty((0, 3))
+
+        labels = (df["device"].str.strip() + "_" + df["event"].str.strip()).str.lower()
+
+        next_auto_code = 900
+        label_to_code = dict(_REACHER_LABEL_TO_CODE)
+        for label in labels.unique():
+            if label not in label_to_code:
+                warnings.warn(
+                    f"Unknown REACHER event '{label}' — auto-assigned code {next_auto_code}.",
+                    UserWarning,
+                )
+                label_to_code[label] = next_auto_code
+                next_auto_code += 1
+
+        codes = labels.map(label_to_code).values.astype(float)
+        start_ts = df["start_timestamp"].values.astype(float)
+        end_ts = df["end_timestamp"].values.astype(float)
+        raw = np.column_stack([codes, start_ts, end_ts])
+
+        if self._event_dict is None:
+            auto_dict = dict(REACHER)
+            for lbl in labels.unique():
+                code = label_to_code[lbl]
+                if code not in auto_dict:
+                    auto_dict[code] = lbl
+            self._event_dict = auto_dict
+
+        return raw
 
     def _create_event_log(self) -> pd.DataFrame:
         log = np.asarray(self._raw_data)
