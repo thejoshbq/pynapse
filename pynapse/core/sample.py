@@ -24,7 +24,8 @@ import pandas as pd
 import scipy.io as sio
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
-from pynapse.core import EventLog, SignalRecording
+from .io.behavior import EventLog
+from .io.microscopy import SignalRecording
 from pynapse.core.mixins import TensorConfigMixin
 
 
@@ -40,6 +41,7 @@ class Sample(TensorConfigMixin):
         frame_correction: bool = False,
         correction_file: Union[str, Path, None] = None,
         start_time: float = 0.0,
+        frame_timestamps: Union[str, Path, np.ndarray, None] = None,
         default_event_id: Optional[Union[int, List[int]]] = None,
         default_pre_event: Optional[float] = None,
         default_post_event: Optional[float] = None,
@@ -66,6 +68,16 @@ class Sample(TensorConfigMixin):
 
         if self._signals.num_frames == 0 or self._event_log.count_events() == 0:
             raise ValueError("Event log or signal recording is empty.")
+
+        if frame_timestamps is not None:
+            if isinstance(frame_timestamps, np.ndarray):
+                self._external_frame_ts = frame_timestamps.astype(float)
+            elif isinstance(frame_timestamps, (str, Path)):
+                self._external_frame_ts = self._load_frame_timestamps_csv(str(frame_timestamps))
+            else:
+                raise TypeError("frame_timestamps must be a file path, numpy array, or None.")
+        else:
+            self._external_frame_ts: Optional[np.ndarray] = None
 
         self._averaged_frame_ts: Optional[np.ndarray] = None
 
@@ -120,6 +132,18 @@ class Sample(TensorConfigMixin):
     @staticmethod
     def _sec_to_frames(s: float, fps: float) -> int:
         return int(s * fps)
+
+    @staticmethod
+    def _load_frame_timestamps_csv(path: str) -> np.ndarray:
+        """Load frame timestamps from a REACHER ``frame_timestamps.csv`` file.
+
+        Returns a 1-D float array of timestamps in ms, sorted by frame index.
+        """
+        df = pd.read_csv(path)
+        if "timestamp_ms" not in df.columns:
+            raise ValueError("frame_timestamps CSV must contain a 'timestamp_ms' column.")
+        df = df.sort_values("frame_index") if "frame_index" in df.columns else df
+        return df["timestamp_ms"].values.astype(float)
 
     def count_events(self, target: int | str = None) -> int:
         return self._event_log.count_events(target)
@@ -180,12 +204,19 @@ class Sample(TensorConfigMixin):
     def _get_frame_timestamps(self) -> np.ndarray:
         if self._averaged_frame_ts is not None:
             return self._averaged_frame_ts
-        raw = self._event_log.get_raw_data()
-        frame_ts_raw = raw[raw[:, 0] == 9, 1]
-        if self._frame_correction:
-            full_ts = self._handle_assumed_frames(self._correction_file)
+
+        if self._external_frame_ts is not None:
+            # REACHER path: frame timestamps supplied externally
+            full_ts = self._external_frame_ts
         else:
-            full_ts = self._handle_missed_frames(frame_ts_raw)
+            # Legacy MATLAB path: extract frame triggers (code 9) from event log
+            raw = self._event_log.get_raw_data()
+            frame_ts_raw = raw[raw[:, 0] == 9, 1]
+            if self._frame_correction:
+                full_ts = self._handle_assumed_frames(self._correction_file)
+            else:
+                full_ts = self._handle_missed_frames(frame_ts_raw)
+
         averaged_ts = full_ts[::self._frame_averaging]
         if self.num_frames != len(averaged_ts):
             print(f"Warning: signal frames ({self.num_frames}) ≠ timestamp frames ({len(averaged_ts)}). "
