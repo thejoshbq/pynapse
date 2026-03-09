@@ -335,6 +335,105 @@ class TestProject:
         assert project.num_populations == 0
 
 
+class TestReacherSample:
+    """Test suite for Sample with REACHER data."""
+
+    def test_init_with_reacher_csv_and_frame_csv(self, mock_reacher_data_files):
+        """Test Sample creation using REACHER CSV files."""
+        behavior_csv, frame_csv, signal_npy = mock_reacher_data_files
+        sample = Sample(
+            event_data=behavior_csv,
+            signal_data=signal_npy,
+            name="REACHER Sample",
+            fps=30.0,
+            frame_timestamps=frame_csv,
+        )
+        assert sample.name == "REACHER Sample"
+        assert sample.num_neurons == 15
+        assert sample.num_frames == 100
+        assert sample.num_events > 0
+
+    def test_frame_timestamps_from_csv(self, mock_reacher_data_files):
+        """Test that frame timestamps from CSV are used for alignment."""
+        behavior_csv, frame_csv, signal_npy = mock_reacher_data_files
+        sample = Sample(
+            event_data=behavior_csv,
+            signal_data=signal_npy,
+            fps=30.0,
+            frame_timestamps=frame_csv,
+        )
+        df = sample.get_dataframe()
+        assert "frame_index" in df.columns
+        assert (df["frame_index"] >= 0).all()
+
+    def test_frame_timestamps_from_array(self, mock_reacher_data_files):
+        """Test that frame timestamps from a numpy array work."""
+        behavior_csv, _, signal_npy = mock_reacher_data_files
+        frame_ts = np.arange(100) * 33.0
+        sample = Sample(
+            event_data=behavior_csv,
+            signal_data=signal_npy,
+            fps=30.0,
+            frame_timestamps=frame_ts,
+        )
+        assert sample.num_frames == 100
+        df = sample.get_dataframe()
+        assert "frame_index" in df.columns
+
+    def test_get_event_timestamps(self, mock_reacher_data_files):
+        """Test retrieving event timestamps by REACHER code."""
+        behavior_csv, frame_csv, signal_npy = mock_reacher_data_files
+        sample = Sample(
+            event_data=behavior_csv,
+            signal_data=signal_npy,
+            fps=30.0,
+            frame_timestamps=frame_csv,
+        )
+        # 101 = rh_lever_active_press
+        ts = sample.get_event_timestamps(101)
+        assert len(ts) >= 1
+        assert all(t > 0 for t in ts)
+
+    def test_count_events_reacher(self, mock_reacher_data_files):
+        """Test event counting with REACHER data."""
+        behavior_csv, frame_csv, signal_npy = mock_reacher_data_files
+        sample = Sample(
+            event_data=behavior_csv,
+            signal_data=signal_npy,
+            fps=30.0,
+            frame_timestamps=frame_csv,
+        )
+        total = sample.count_events()
+        assert total > 0
+        # Count by label
+        active = sample.count_events("rh_lever_active_press")
+        assert active >= 1
+
+    def test_dataframe_columns(self, mock_reacher_data_files):
+        """Test that the DataFrame has all expected columns."""
+        behavior_csv, frame_csv, signal_npy = mock_reacher_data_files
+        sample = Sample(
+            event_data=behavior_csv,
+            signal_data=signal_npy,
+            fps=30.0,
+            frame_timestamps=frame_csv,
+        )
+        df = sample.get_dataframe()
+        for col in ("code", "t1", "t2", "label", "frame_index"):
+            assert col in df.columns
+
+    def test_frame_timestamps_invalid_type_raises(self, mock_reacher_data_files):
+        """Test that invalid frame_timestamps type raises TypeError."""
+        behavior_csv, _, signal_npy = mock_reacher_data_files
+        with pytest.raises(TypeError, match="frame_timestamps must be"):
+            Sample(
+                event_data=behavior_csv,
+                signal_data=signal_npy,
+                fps=30.0,
+                frame_timestamps=12345,
+            )
+
+
 # Integration tests
 class TestSamplePopulationProjectIntegration:
     """Integration tests for Sample, Population, and Project together."""

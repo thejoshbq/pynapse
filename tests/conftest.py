@@ -119,6 +119,91 @@ def mock_data_files(temp_data_dir):
     return event_file, signal_file, event_dict
 
 
+def create_mock_reacher_behavior_csv(path: Path, n_events: int = 20) -> str:
+    """Create a mock REACHER behavior_events.csv file.
+
+    Generates a CSV in the format produced by the REACHER backend:
+    device,event,start_timestamp,end_timestamp,start_frame_index,end_frame_index
+
+    Timestamps are in milliseconds (session-relative).
+
+    Args:
+        path: Directory where the file is created.
+        n_events: Approximate number of behavioral events to generate.
+
+    Returns:
+        String path to the created CSV file.
+    """
+    import csv as _csv
+
+    devices_events = [
+        ("RH_LEVER", "ACTIVE_PRESS"),
+        ("RH_LEVER", "TIMEOUT_PRESS"),
+        ("RH_LEVER", "INACTIVE_PRESS"),
+        ("PUMP", "INFUSION"),
+        ("CUE", "TONE"),
+        ("LICK", "LICK"),
+    ]
+
+    csv_path = path / "behavior_events.csv"
+    ts = 500  # start 500 ms into the session
+    with open(csv_path, "w", newline="") as f:
+        writer = _csv.DictWriter(
+            f,
+            fieldnames=["device", "event", "start_timestamp", "end_timestamp",
+                        "start_frame_index", "end_frame_index"],
+        )
+        writer.writeheader()
+        for i in range(n_events):
+            dev, evt = devices_events[i % len(devices_events)]
+            duration = 200 if dev != "PUMP" else 2000
+            writer.writerow({
+                "device": dev,
+                "event": evt,
+                "start_timestamp": ts,
+                "end_timestamp": ts + duration,
+                "start_frame_index": ts // 33,
+                "end_frame_index": (ts + duration) // 33,
+            })
+            ts += duration + np.random.randint(300, 2000)
+
+    return str(csv_path)
+
+
+def create_mock_reacher_frame_csv(path: Path, n_frames: int = 100) -> str:
+    """Create a mock REACHER frame_timestamps.csv file.
+
+    Args:
+        path: Directory where the file is created.
+        n_frames: Number of frames.
+
+    Returns:
+        String path to the created CSV file.
+    """
+    import csv as _csv
+
+    csv_path = path / "frame_timestamps.csv"
+    with open(csv_path, "w", newline="") as f:
+        writer = _csv.DictWriter(f, fieldnames=["frame_index", "timestamp_ms"])
+        writer.writeheader()
+        for i in range(n_frames):
+            writer.writerow({"frame_index": i, "timestamp_ms": i * 33})
+
+    return str(csv_path)
+
+
+@pytest.fixture
+def mock_reacher_data_files(temp_data_dir):
+    """Create mock REACHER event CSV, frame CSV, and signal data files.
+
+    Returns a tuple of (behavior_csv_path, frame_csv_path, signal_npy_path).
+    """
+    behavior_csv = create_mock_reacher_behavior_csv(temp_data_dir, n_events=20)
+    frame_csv = create_mock_reacher_frame_csv(temp_data_dir, n_frames=100)
+    signal_file = create_mock_signal_file(temp_data_dir, n_neurons=15, n_frames=100)
+    return behavior_csv, frame_csv, signal_file
+
+
 # Configure pytest to show more detailed output
 def pytest_configure(config):
     """Configure pytest with custom markers."""

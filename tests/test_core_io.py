@@ -207,6 +207,111 @@ class TestSignalRecording:
         assert recording.num_frames == 100
 
 
+class TestReacherEventLog:
+    """Test suite for EventLog with REACHER CSV files."""
+
+    @pytest.fixture
+    def reacher_csv(self, tmp_path):
+        """Create a minimal REACHER behavior_events.csv."""
+        from tests.conftest import create_mock_reacher_behavior_csv
+        return create_mock_reacher_behavior_csv(tmp_path, n_events=10)
+
+    def test_load_reacher_csv(self, reacher_csv):
+        """Test that a REACHER CSV loads without errors."""
+        log = EventLog(source=reacher_csv)
+        assert log.num_events > 0
+
+    def test_auto_event_dict(self, reacher_csv):
+        """Test that event_dict is auto-populated from the REACHER mapping."""
+        log = EventLog(source=reacher_csv)
+        df = log.get_dataframe()
+        # Labels should not be "unknown"
+        assert (df["label"] != "unknown").all()
+
+    def test_known_labels_mapped(self, reacher_csv):
+        """Test that known device+event pairs map to the correct labels."""
+        log = EventLog(source=reacher_csv)
+        df = log.get_dataframe()
+        labels = set(df["label"].unique())
+        expected_subset = {"rh_lever_active_press", "pump_infusion", "cue_tone"}
+        assert expected_subset.issubset(labels)
+
+    def test_integer_codes_assigned(self, reacher_csv):
+        """Test that integer codes from REACHER dict are assigned."""
+        from pynapse.config.events import _REACHER_LABEL_TO_CODE
+        log = EventLog(source=reacher_csv)
+        df = log.get_dataframe()
+        for _, row in df.iterrows():
+            assert row["code"] == _REACHER_LABEL_TO_CODE[row["label"]]
+
+    def test_timestamps_preserved(self, reacher_csv):
+        """Test that start and end timestamps are preserved."""
+        log = EventLog(source=reacher_csv)
+        df = log.get_dataframe()
+        assert (df["t1"] > 0).all()
+        assert df["t2"].notna().all()
+
+    def test_raw_data_shape(self, reacher_csv):
+        """Test that raw data has 3 columns (code, start_ts, end_ts)."""
+        log = EventLog(source=reacher_csv)
+        raw = log.get_raw_data()
+        assert raw.ndim == 2
+        assert raw.shape[1] == 3
+
+    def test_custom_event_dict_filters(self, reacher_csv):
+        """Test that a user-provided event_dict filters events."""
+        custom_dict = {101: "rh_lever_active_press", 201: "pump_infusion"}
+        log = EventLog(source=reacher_csv, event_dict=custom_dict)
+        df = log.get_dataframe()
+        assert set(df["label"].unique()).issubset({"rh_lever_active_press", "pump_infusion"})
+
+    def test_count_events_by_label(self, reacher_csv):
+        """Test counting REACHER events by string label."""
+        log = EventLog(source=reacher_csv)
+        count = log.count_events("rh_lever_active_press")
+        assert count >= 1
+
+    def test_count_events_by_code(self, reacher_csv):
+        """Test counting REACHER events by integer code."""
+        log = EventLog(source=reacher_csv)
+        count = log.count_events(101)  # rh_lever_active_press
+        assert count >= 1
+
+    def test_unknown_event_auto_assigned(self, tmp_path):
+        """Test that unknown device+event combos get auto-assigned codes >= 900."""
+        import csv as _csv
+        csv_path = tmp_path / "behavior_events.csv"
+        with open(csv_path, "w", newline="") as f:
+            writer = _csv.DictWriter(
+                f,
+                fieldnames=["device", "event", "start_timestamp", "end_timestamp",
+                            "start_frame_index", "end_frame_index"],
+            )
+            writer.writeheader()
+            writer.writerow({
+                "device": "MYSTERY_DEVICE", "event": "UNKNOWN_EVENT",
+                "start_timestamp": 100, "end_timestamp": 200,
+                "start_frame_index": 3, "end_frame_index": 6,
+            })
+
+        with pytest.warns(UserWarning, match="Unknown REACHER event"):
+            log = EventLog(source=str(csv_path))
+        df = log.get_dataframe()
+        assert (df["code"] >= 900).all()
+
+    def test_missing_csv_columns_raises(self, tmp_path):
+        """Test that a CSV with wrong columns raises ValueError."""
+        csv_path = tmp_path / "bad.csv"
+        csv_path.write_text("col_a,col_b\n1,2\n")
+        with pytest.raises(ValueError, match="missing required columns"):
+            EventLog(source=str(csv_path))
+
+    def test_path_object_support(self, reacher_csv):
+        """Test that Path objects work for REACHER CSV."""
+        log = EventLog(source=Path(reacher_csv))
+        assert log.num_events > 0
+
+
 # Integration tests
 class TestEventLogSignalRecordingIntegration:
     """Integration tests for EventLog and SignalRecording together."""
