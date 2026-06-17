@@ -15,7 +15,7 @@ pytest -m unit                      # only unit-marked tests (markers: unit, int
 pytest --cov=pynapse --cov-report=html
 ```
 
-There is **no linter/formatter configured for pynapse** (the wider REACHER suite uses ruff, but pynapse is not ruff-configured). Don't add one without asking.
+There is **no linter/formatter configured for pynapse** (the wider Phoxel Workbench uses ruff, but pynapse is not ruff-configured). Don't add one without asking.
 
 The dataset-ingestion script under `scripts/` (`ingest_prl_nac_g6_her.py`) is hard-coded to a local data path — treat it as a per-dataset template, not a generic CLI.
 
@@ -73,7 +73,7 @@ See `docs/database-guide.md` for the full DB user/architecture reference and `do
 
 ## Conventions
 
-- **Python ≥ 3.8** per `pyproject.toml` (vs. ≥ 3.10 elsewhere in REACHER-Suite). The DB layer assumes 3.10+ idioms in places — if you touch `db/`, target 3.10+.
+- **Python ≥ 3.8** per `pyproject.toml` (vs. ≥ 3.10 elsewhere in Phoxel Workbench). The DB layer assumes 3.10+ idioms in places — if you touch `db/`, target 3.10+.
 - **Dependencies are pinned** in `pyproject.toml`. Don't bump versions casually.
 - **Test suite has known pre-existing failures** in `test_core_io`, `test_peri_event`, `test_preprocessing` unrelated to current DB work. `test_db.py` (35 unit tests, in-memory DuckDB) and `test_db_integration.py` (real REACHER data, skipped if absent) should stay green.
 - **Pytest markers**: `unit`, `integration`, `slow` — use them when adding tests so the suite stays filterable.
