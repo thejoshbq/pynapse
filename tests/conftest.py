@@ -204,6 +204,73 @@ def mock_reacher_data_files(temp_data_dir):
     return behavior_csv, frame_csv, signal_file
 
 
+def create_mock_roigbiv_h5(
+    path: Path,
+    n_neurons: int = 5,
+    n_frames: int = 100,
+    fs: float = 7.5,
+    kinds: tuple = ("f", "dff"),
+    filename: str = "traces.h5",
+) -> str:
+    """Create a mock roigbiv `.h5` trace export.
+
+    Mirrors the schema written by `roigbiv/pipeline/export_io.py`: one
+    `pandas.HDFStore` with a `(n_frames, n_neurons)` DataFrame per requested
+    kind (index `time_s`, columns = neuron ids) plus a `/meta` table with an
+    authoritative `fs`.
+
+    Args:
+        path: Directory where the file is created.
+        n_neurons: Number of ROIs/neurons.
+        n_frames: Number of frames.
+        fs: Effective sampling rate in Hz (post frame-averaging).
+        kinds: Which trace kinds to write (subset of "f", "dff", "raw", "neuropil").
+        filename: Name of the `.h5` file.
+
+    Returns:
+        String path to the created `.h5` file.
+    """
+    import pandas as pd
+
+    h5_path = path / filename
+    neuron_ids = [f"lcl:{i}" for i in range(n_neurons)]
+    time_s = np.arange(n_frames) / fs
+
+    with pd.HDFStore(str(h5_path), mode="w") as store:
+        for kind in kinds:
+            data = np.random.rand(n_frames, n_neurons).astype(np.float32)
+            df = pd.DataFrame(data, index=pd.Index(time_s, name="time_s"), columns=neuron_ids)
+            store.put(f"/{kind}", df, format="table", data_columns=True)
+
+        meta = pd.DataFrame(
+            {
+                "local_label_id": list(range(n_neurons)),
+                "global_cell_id": [None] * n_neurons,
+                "source_stage": [4] * n_neurons,
+                "gate_outcome": ["accept"] * n_neurons,
+                "confidence": ["high"] * n_neurons,
+                "activity_type": [None] * n_neurons,
+                "session_id": [None] * n_neurons,
+                "fov_id": [None] * n_neurons,
+                "fs": [fs] * n_neurons,
+                "n_frames": [n_frames] * n_neurons,
+            },
+            index=pd.Index(neuron_ids, name="neuron_id"),
+        )
+        store.put("/meta", meta, format="table", data_columns=True)
+
+    return str(h5_path)
+
+
+@pytest.fixture
+def mock_roigbiv_h5_file(temp_data_dir):
+    """Create a mock roigbiv `.h5` trace export with `/f` and `/dff` kinds.
+
+    Returns the string path to the created `.h5` file.
+    """
+    return create_mock_roigbiv_h5(temp_data_dir, n_neurons=5, n_frames=100, fs=7.5)
+
+
 # Configure pytest to show more detailed output
 def pytest_configure(config):
     """Configure pytest with custom markers."""

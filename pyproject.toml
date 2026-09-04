@@ -57,6 +57,7 @@ dependencies = [
     "seaborn==0.13.2",
     "six==1.17.0",
     "stack-data==0.6.3",
+    "tables>=3.9.0",
     "threadpoolctl==3.6.0",
     "tqdm==4.67.1",
     "traitlets==5.14.3",
